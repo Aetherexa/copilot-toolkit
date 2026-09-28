@@ -62,6 +62,11 @@ export class WorkspaceIndexer {
     this.emitter.emit('change');
   }
 
+  markError(message: string): void {
+    this.refreshStatus('error', message);
+    this.emitter.emit('change');
+  }
+
   getFiles(): IndexedWorkspaceFile[] {
     return [...this.files.values()].sort((left, right) => left.info.relativePath.localeCompare(right.info.relativePath));
   }
