@@ -4,9 +4,9 @@ import { GraphView, IndexingStatus } from '@shared/domain/graph';
 import { StudioBootstrapPayload, StudioExtensionMessage, StudioWebviewMessage } from '@shared/domain/messages';
 import { PromptCollection, PromptDefinition, PromptPreview } from '@shared/domain/prompt';
 import { AIProvider } from '@shared/domain/provider';
-import { Workflow } from '@shared/domain/workflow';
+import { Workflow, WorkflowStep } from '@shared/domain/workflow';
 
-export type { ContextBinding, ContextType, ResolvedContext, PromptExecutionRecord, WorkflowExecutionRecord, PromptCollection, PromptDefinition, PromptPreview, AIProvider, GraphView, IndexingStatus, Workflow, StudioBootstrapPayload, StudioExtensionMessage, StudioWebviewMessage };
+export type { ContextBinding, ContextType, ResolvedContext, PromptExecutionRecord, WorkflowExecutionRecord, PromptCollection, PromptDefinition, PromptPreview, AIProvider, GraphView, IndexingStatus, Workflow, WorkflowStep, StudioBootstrapPayload, StudioExtensionMessage, StudioWebviewMessage };
 
 export interface StudioAppState {
   prompts: PromptDefinition[];
