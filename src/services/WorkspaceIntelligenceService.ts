@@ -18,7 +18,9 @@ export class WorkspaceIntelligenceService {
     private readonly workspaceIndex: WorkspaceIndexService,
   ) {
     const notify = () => this.statusEmitter.fire(this.getStatus());
-    this.indexer.onDidChange(notify);
+    const disposeIndexerListener = this.indexer.onDidChange(notify);
+    context.subscriptions.push({ dispose: disposeIndexerListener });
+    context.subscriptions.push(this.statusEmitter);
     context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(document => {
       void this.upsertPath(document.uri.fsPath, document.getText());
     }));
@@ -72,13 +74,7 @@ export class WorkspaceIntelligenceService {
       await this.indexer.initialize(indexed);
       this.statusEmitter.fire(this.getStatus());
     } catch (error) {
-      this.statusEmitter.fire({
-        state: 'error',
-        filesIndexed: 0,
-        entities: 0,
-        relationships: 0,
-        message: error instanceof Error ? error.message : 'Workspace indexing failed.',
-      });
+      this.indexer.markError(error instanceof Error ? error.message : 'Workspace indexing failed.');
     }
   }
 
@@ -109,7 +105,11 @@ export class WorkspaceIntelligenceService {
   }
 
   async openFile(filePath: string): Promise<void> {
-    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+    const indexedFile = await this.workspaceIndex.getFileInfo(filePath);
+    if (!indexedFile) {
+      throw new Error('Refusing to open a file outside the indexed workspace.');
+    }
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(indexedFile.absolutePath));
     await vscode.window.showTextDocument(document, { preview: false });
   }
 }
