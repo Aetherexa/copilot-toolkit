@@ -94,6 +94,27 @@ test('ContextEngine preserves binding order across multiple resolvers', async ()
   assert.deepEqual(result.items.map(item => item.type), ['currentSelection', 'currentFile']);
 });
 
+test('ContextEngine budgets additional workflow context instead of appending it outside the limit', async () => {
+  const engine = new ContextEngine(new ContextRegistry(), new ContextRanker(), new TokenEstimator());
+  const extra: ResolvedContext = {
+    type: 'workspaceSummary',
+    title: 'Previous Step Output',
+    content: 'x'.repeat(800),
+    tokenEstimate: 200,
+    originalTokenEstimate: 200,
+    truncated: false,
+    relevanceScore: 85,
+  };
+
+  const result = await engine.resolve([], 100, [extra]);
+
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].status, 'included');
+  assert.equal(result.items[0].truncated, true);
+  assert.ok(result.includedTokens <= 100);
+  assert.equal(result.totalCandidateTokens, 200);
+});
+
 test('PromptAssembler allows empty context', () => {
   const assembler = new PromptAssembler();
   const output = assembler.assemble(makePrompt(), []);

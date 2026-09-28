@@ -75,10 +75,13 @@ export class ExecutionEngine {
 
   async preparePrompt(prompt: PromptDefinition, extraContext: ResolvedContext[] = []): Promise<PreparedPromptExecution> {
     const executionId = createId();
-    const resolution = await this.contextEngine.resolve(prompt.context, prompt.contextBudgetTokens ?? 1800);
-    const mergedContext = [...resolution.items, ...extraContext];
-    const includedMerged = mergedContext.filter(item => item.status !== 'excluded');
-    const contextTokens = includedMerged.reduce((sum, item) => sum + item.tokenEstimate, 0);
+    const resolution = await this.contextEngine.resolve(
+      prompt.context,
+      prompt.contextBudgetTokens ?? 1800,
+      extraContext,
+    );
+    const mergedContext = resolution.items;
+    const contextTokens = resolution.includedTokens;
     const assembledPrompt = this.promptAssembler.assemble(prompt, mergedContext);
     const estimatedInputTokens = this.tokenEstimator.estimate(assembledPrompt);
     return {
@@ -88,8 +91,8 @@ export class ExecutionEngine {
         contextTokens,
         totalTokens: estimatedInputTokens,
         contextBudgetTokens: prompt.contextBudgetTokens ?? 1800,
-        totalCandidateContextTokens: resolution.totalCandidateTokens + extraContext.reduce((sum, item) => sum + (item.originalTokenEstimate ?? item.tokenEstimate), 0),
-        utilizationPercent: resolution.budgetTokens > 0 ? Math.min(100, Math.round((contextTokens / (prompt.contextBudgetTokens ?? resolution.budgetTokens)) * 100)) : 0,
+        totalCandidateContextTokens: resolution.totalCandidateTokens,
+        utilizationPercent: resolution.utilizationPercent,
         excludedContextCount: mergedContext.filter(item => item.status === 'excluded').length,
         resolvedContext: mergedContext,
       },

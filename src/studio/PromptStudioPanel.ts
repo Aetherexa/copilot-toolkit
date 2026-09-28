@@ -286,7 +286,7 @@ export class PromptStudioPanel {
 
     try {
       const result = await this.services.promptRepository.savePrompt(message.payload.prompt, message.payload.mode);
-      this.postBootstrap(result.snapshot, result.savedPrompt.id);
+      await this.postBootstrap(result.snapshot, result.savedPrompt.id);
       this.postNotice(`Saved ${result.savedPrompt.name}.`);
     } catch (error) {
       this.postError(error instanceof Error ? error.message : 'Prompt save failed.');
@@ -362,7 +362,7 @@ export class PromptStudioPanel {
   private async handleCreatePrompt(message: PromptCreateRequest): Promise<void> {
     try {
       const result = await this.services.promptRepository.createPrompt(message.payload?.name);
-      this.postBootstrap(result.snapshot, result.prompt.id);
+      await this.postBootstrap(result.snapshot, result.prompt.id);
       this.postNotice(`Created ${result.prompt.name}.`);
     } catch (error) {
       this.postError(error instanceof Error ? error.message : 'Prompt creation failed.');
@@ -377,7 +377,7 @@ export class PromptStudioPanel {
 
     try {
       const snapshot = await this.services.promptRepository.deletePrompt(message.payload.promptId);
-      this.postBootstrap(snapshot);
+      await this.postBootstrap(snapshot);
       this.postNotice('Prompt deleted.');
     } catch (error) {
       this.postError(error instanceof Error ? error.message : 'Prompt delete failed.');
@@ -392,7 +392,7 @@ export class PromptStudioPanel {
 
     try {
       const result = await this.services.promptRepository.duplicatePrompt(message.payload.promptId);
-      this.postBootstrap(result.snapshot, result.duplicatedPrompt.id);
+      await this.postBootstrap(result.snapshot, result.duplicatedPrompt.id);
       this.postNotice(`Duplicated ${result.duplicatedPrompt.name}.`);
     } catch (error) {
       this.postError(error instanceof Error ? error.message : 'Prompt duplication failed.');
@@ -407,7 +407,7 @@ export class PromptStudioPanel {
 
     try {
       const snapshot = await this.services.promptRepository.setFavorite(message.payload.promptId, message.payload.favorite);
-      this.postBootstrap(snapshot, message.payload.promptId);
+      await this.postBootstrap(snapshot, message.payload.promptId);
       this.postNotice(message.payload.favorite ? 'Prompt added to favorites.' : 'Prompt removed from favorites.');
     } catch (error) {
       this.postError(error instanceof Error ? error.message : 'Favorite update failed.');
@@ -417,7 +417,7 @@ export class PromptStudioPanel {
   private async handleCreateCollection(message: CollectionCreateRequest): Promise<void> {
     try {
       const result = await this.services.promptRepository.createCollection(message.payload?.name);
-      this.postBootstrap(result.snapshot);
+      await this.postBootstrap(result.snapshot);
       this.postNotice(`Created collection ${result.collection.name}.`);
     } catch (error) {
       this.postError(error instanceof Error ? error.message : 'Collection creation failed.');
@@ -432,7 +432,7 @@ export class PromptStudioPanel {
 
     try {
       const snapshot = await this.services.promptRepository.renameCollection(message.payload.collectionId, message.payload.name);
-      this.postBootstrap(snapshot);
+      await this.postBootstrap(snapshot);
       this.postNotice('Collection renamed.');
     } catch (error) {
       this.postError(error instanceof Error ? error.message : 'Collection rename failed.');
@@ -447,7 +447,7 @@ export class PromptStudioPanel {
 
     try {
       const snapshot = await this.services.promptRepository.deleteCollection(message.payload.collectionId);
-      this.postBootstrap(snapshot);
+      await this.postBootstrap(snapshot);
       this.postNotice('Collection deleted.');
     } catch (error) {
       this.postError(error instanceof Error ? error.message : 'Collection delete failed.');
@@ -462,7 +462,7 @@ export class PromptStudioPanel {
 
     try {
       const snapshot = await this.services.promptRepository.addPromptToCollection(message.payload.collectionId, message.payload.promptId);
-      this.postBootstrap(snapshot, message.payload.promptId);
+      await this.postBootstrap(snapshot, message.payload.promptId);
       this.postNotice('Prompt added to collection.');
     } catch (error) {
       this.postError(error instanceof Error ? error.message : 'Adding prompt to collection failed.');
@@ -477,7 +477,7 @@ export class PromptStudioPanel {
 
     try {
       const snapshot = await this.services.promptRepository.removePromptFromCollection(message.payload.collectionId, message.payload.promptId);
-      this.postBootstrap(snapshot, message.payload.promptId);
+      await this.postBootstrap(snapshot, message.payload.promptId);
       this.postNotice('Prompt removed from collection.');
     } catch (error) {
       this.postError(error instanceof Error ? error.message : 'Removing prompt from collection failed.');
@@ -487,7 +487,7 @@ export class PromptStudioPanel {
   private async handleImport(): Promise<void> {
     try {
       const result = await this.services.promptRepository.importFromJson();
-      this.postBootstrap(result.snapshot, result.importedPromptIds[0]);
+      await this.postBootstrap(result.snapshot, result.importedPromptIds[0]);
       this.postNotice('Import completed.');
     } catch (error) {
       this.postError(error instanceof Error ? error.message : 'Import failed.');
@@ -728,10 +728,11 @@ export class PromptStudioPanel {
     this.postNotice('Workflow execution history cleared.');
   }
 
-  private postBootstrap(snapshot: Parameters<ServiceContainer['toBootstrap']>[0], activePromptId?: string): void {
+  private async postBootstrap(snapshot: Parameters<ServiceContainer['toBootstrap']>[0], activePromptId?: string): Promise<void> {
+    const workflows = (await this.services.workflowRepository.loadSnapshot()).workflows;
     this.postMessage({
       type: 'studio.bootstrap',
-      payload: this.services.toBootstrap(snapshot, activePromptId),
+      payload: this.services.toBootstrap(snapshot, workflows, activePromptId),
     });
   }
 

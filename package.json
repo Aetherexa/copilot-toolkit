@@ -41,12 +41,12 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/imsp-vibe-Coder-2596/copilot-toolkit"
+		"url": "https://github.com/Aetherexa/copilot-toolkit"
 	},
 	"bugs": {
-		"url": "https://github.com/imsp-vibe-Coder-2596/copilot-toolkit/issues"
+		"url": "https://github.com/Aetherexa/copilot-toolkit/issues"
 	},
-	"homepage": "https://github.com/imsp-vibe-Coder-2596/copilot-toolkit#readme",
+	"homepage": "https://github.com/Aetherexa/copilot-toolkit#readme",
 	"license": "MIT",
 	"main": "./out/extension.js",
 	"contributes": {		"commands": [
@@ -122,12 +122,15 @@
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
-		"compile": "npm run compile:extension && npm run build:webview",
+		"compile": "npm run compile:extension && npm run typecheck:webview && npm run build:webview",
 		"compile:extension": "tsc -p ./",
+		"typecheck:webview": "tsc -p webview-ui/tsconfig.json --noEmit",
 		"build:webview": "vite build --config webview-ui/vite.config.ts",
 		"watch": "tsc -watch -p ./",
 		"lint": "eslint src",
-		"test": "npm run compile:extension && node --test out/test/**/*.test.js"
+		"test": "npm run compile:extension && node --test out/test/*.test.js",
+		"test:coverage": "npm run compile:extension && node --test --experimental-test-coverage --test-coverage-lines=70 --test-coverage-branches=70 --test-coverage-functions=70 out/test/*.test.js",
+		"quality": "npm run compile && npm run test:coverage"
 	},
 	"dependencies": {
 		"react": "^18.3.1",

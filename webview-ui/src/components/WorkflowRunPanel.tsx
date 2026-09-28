@@ -16,6 +16,16 @@ export function WorkflowRunPanel({ record, runningExecutionId, streamingStepOutp
       </div>
 
       {!record && !runningExecutionId && <p className="empty-state">Run a workflow to inspect step-by-step execution and final output.</p>}
+      {runningExecutionId && Object.keys(streamingStepOutputs).length === 0 && <p className="empty-state">Workflow is running. Waiting for output...</p>}
+      {runningExecutionId && Object.entries(streamingStepOutputs).map(([stepId, output]) => (
+        <div key={stepId} className="history-item">
+          <div className="history-item-main">
+            <strong>{stepId}</strong>
+            <span>running</span>
+            <span>{output || 'Waiting for output...'}</span>
+          </div>
+        </div>
+      ))}
 
       {record && (
         <div className="preview-metrics output-metrics">
@@ -33,6 +43,7 @@ export function WorkflowRunPanel({ record, runningExecutionId, streamingStepOutp
               <strong>{step.stepName}</strong>
               <span>{step.status} · {step.durationMs} ms</span>
               <span>{step.providerName ?? step.providerId ?? 'Default provider'} · {step.modelName ?? step.modelId ?? 'Default model'}</span>
+              <span>Tokens: in {step.usage.actualInputTokens ?? step.usage.estimatedInputTokens ?? 'n/a'} · out {step.usage.outputTokens ?? 'n/a'}</span>
               <span>{step.error ?? step.outputPreview ?? streamingStepOutputs[step.stepId] ?? 'No output captured.'}</span>
             </div>
           </div>

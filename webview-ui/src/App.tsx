@@ -10,6 +10,9 @@ import { OutputPanel } from './components/OutputPanel';
 import { ProviderSelector } from './components/ProviderSelector';
 import { TokenSummary } from './components/TokenSummary';
 import { PromptPreview } from './components/PromptPreview';
+import { WorkflowBuilder } from './components/WorkflowBuilder';
+import { WorkflowHistoryPanel } from './components/WorkflowHistoryPanel';
+import { WorkflowRunPanel } from './components/WorkflowRunPanel';
 import { getPersistedState, onMessage, postMessage, setPersistedState } from './vscode';
 import type {
   ContextBinding,
@@ -17,6 +20,8 @@ import type {
   GraphView,
   IndexingStatus,
   PromptExecutionRecord,
+  WorkflowExecutionRecord,
+  Workflow,
   PromptCollection,
   PromptDefinition,
   PromptPreview as PromptPreviewModel,
@@ -43,6 +48,23 @@ function clonePrompt(prompt: PromptDefinition): PromptDefinition {
       options: binding.options ? { ...binding.options } : undefined,
     })),
   };
+}
+
+function cloneWorkflow(workflow: Workflow): Workflow {
+  return {
+    ...workflow,
+    steps: workflow.steps.map(step => ({
+      ...step,
+      contextBindings: step.contextBindings?.map(binding => ({
+        ...binding,
+        options: binding.options ? { ...binding.options } : undefined,
+      })),
+    })),
+  };
+}
+
+function isWorkflowDirty(draft: Workflow | null, saved: Workflow | null): boolean {
+  return Boolean(draft && saved && JSON.stringify(draft) !== JSON.stringify(saved));
 }
 
 function isTabDirty(tab: PromptTabState): boolean {
@@ -167,6 +189,15 @@ function mergeBootstrapState(
 export default function App() {
   const [prompts, setPrompts] = useState<PromptDefinition[]>([]);
   const [collections, setCollections] = useState<PromptCollection[]>([]);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [workflowHistory, setWorkflowHistory] = useState<WorkflowExecutionRecord[]>([]);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(defaultState?.selectedWorkflowId ?? null);
+  const [workflowDraft, setWorkflowDraft] = useState<Workflow | null>(null);
+  const [workflowSaved, setWorkflowSaved] = useState<Workflow | null>(null);
+  const [selectedWorkflowExecutionId, setSelectedWorkflowExecutionId] = useState<string | null>(defaultState?.selectedWorkflowExecutionId ?? null);
+  const [runningWorkflowExecutionId, setRunningWorkflowExecutionId] = useState<string | null>(null);
+  const [streamingStepOutputs, setStreamingStepOutputs] = useState<Record<string, string>>({});
+  const [workflowView, setWorkflowView] = useState<'run' | 'history'>('run');
   const [tabs, setTabs] = useState<PromptTabState[]>(defaultState?.tabs ?? []);
   const [activeTabId, setActiveTabId] = useState<string | null>(defaultState?.activeTabId ?? null);
   const [providers, setProviders] = useState<StudioBootstrapPayload['providers']>([]);
@@ -194,12 +225,22 @@ export default function App() {
 
   const tabsRef = useRef(tabs);
   const activeTabIdRef = useRef(activeTabId);
+  const selectedWorkflowIdRef = useRef(selectedWorkflowId);
+  const workflowDraftRef = useRef(workflowDraft);
+  const workflowSavedRef = useRef(workflowSaved);
+  const pendingWorkflowActionRef = useRef<'first' | 'refresh-current' | null>(null);
   const pendingActionRef = useRef<PendingAction>(null);
 
   useEffect(() => {
     tabsRef.current = tabs;
     activeTabIdRef.current = activeTabId;
   }, [tabs, activeTabId]);
+
+  useEffect(() => {
+    selectedWorkflowIdRef.current = selectedWorkflowId;
+    workflowDraftRef.current = workflowDraft;
+    workflowSavedRef.current = workflowSaved;
+  }, [selectedWorkflowId, workflowDraft, workflowSaved]);
 
   const activeTab = useMemo(
     () => tabs.find(tab => tab.id === activeTabId) ?? null,
@@ -215,6 +256,8 @@ export default function App() {
       if (incoming.type === 'studio.bootstrap') {
         setPrompts(incoming.payload.prompts);
         setCollections(incoming.payload.collections);
+        setWorkflows(incoming.payload.workflows);
+        setWorkflowHistory(incoming.payload.workflowHistory);
         setProviders(incoming.payload.providers);
         setExecutionHistory(incoming.payload.executionHistory);
         setIndexingStatus(incoming.payload.indexingStatus);
@@ -229,6 +272,34 @@ export default function App() {
 
         setTabs(merged.tabs);
         setActiveTabId(merged.activeTabId);
+
+        let nextWorkflowId = selectedWorkflowIdRef.current;
+        if (pendingWorkflowActionRef.current === 'first') {
+          nextWorkflowId = incoming.payload.workflows[0]?.id ?? null;
+        }
+        if (!nextWorkflowId || !incoming.payload.workflows.some(workflow => workflow.id === nextWorkflowId)) {
+          nextWorkflowId = incoming.payload.workflows[0]?.id ?? null;
+        }
+
+        const persistedWorkflow = incoming.payload.workflows.find(workflow => workflow.id === nextWorkflowId);
+        const currentDraft = workflowDraftRef.current;
+        const currentSaved = workflowSavedRef.current;
+        const keepDirtyDraft = Boolean(
+          currentDraft
+          && currentSaved
+          && persistedWorkflow
+          && currentDraft.id === persistedWorkflow.id
+          && isWorkflowDirty(currentDraft, currentSaved)
+          && pendingWorkflowActionRef.current === null,
+        );
+
+        setSelectedWorkflowId(nextWorkflowId);
+        if (!keepDirtyDraft) {
+          setWorkflowDraft(persistedWorkflow ? cloneWorkflow(persistedWorkflow) : null);
+          setWorkflowSaved(persistedWorkflow ? cloneWorkflow(persistedWorkflow) : null);
+        }
+        pendingWorkflowActionRef.current = null;
+
         setIsSaving(false);
         pendingActionRef.current = null;
         setError('');
@@ -267,9 +338,44 @@ export default function App() {
 
       if (incoming.type === 'execution.history') {
         setExecutionHistory(incoming.payload.history);
-        if (selectedExecutionId && !incoming.payload.history.some(item => item.id === selectedExecutionId)) {
-          setSelectedExecutionId(incoming.payload.history[0]?.id ?? null);
+        setSelectedExecutionId(current =>
+          current && incoming.payload.history.some(item => item.id === current)
+            ? current
+            : incoming.payload.history[0]?.id ?? null,
+        );
+      }
+
+      if (incoming.type === 'workflow.progress') {
+        setRunningWorkflowExecutionId(incoming.payload.executionId);
+        setWorkflowView('run');
+        if (incoming.payload.stepId && incoming.payload.chunk) {
+          const stepId = incoming.payload.stepId;
+          setStreamingStepOutputs(current => ({
+            ...current,
+            [stepId]: `${current[stepId] ?? ''}${incoming.payload.chunk}`,
+          }));
         }
+      }
+
+      if (incoming.type === 'workflow.result') {
+        setRunningWorkflowExecutionId(null);
+        setWorkflowHistory(current => [
+          incoming.payload.record,
+          ...current.filter(item => item.id !== incoming.payload.record.id),
+        ]);
+        setSelectedWorkflowExecutionId(incoming.payload.record.id);
+        setStreamingStepOutputs({});
+        setWorkflowView('run');
+        setMessage(incoming.payload.message ?? (incoming.payload.success ? 'Workflow completed.' : 'Workflow finished with errors.'));
+      }
+
+      if (incoming.type === 'workflow.history') {
+        setWorkflowHistory(incoming.payload.history);
+        setSelectedWorkflowExecutionId(current =>
+          current && incoming.payload.history.some(item => item.id === current)
+            ? current
+            : incoming.payload.history[0]?.id ?? null,
+        );
       }
 
       if (incoming.type === 'provider.updated') {
@@ -297,9 +403,11 @@ export default function App() {
         setError(incoming.payload.message);
         setIsPreviewing(false);
         setIsRunning(false);
+        setRunningWorkflowExecutionId(null);
         setIsSaving(false);
         setIsRefreshingProviders(false);
         pendingActionRef.current = null;
+        pendingWorkflowActionRef.current = null;
       }
     });
   }, []);
@@ -313,16 +421,20 @@ export default function App() {
       searchQuery,
       activeWorkbenchTab,
       selectedExecutionId,
+      selectedWorkflowExecutionId,
+      selectedWorkflowId,
       mapReverse,
       mapDepth,
     });
-  }, [tabs, activeTabId, activeNav, selectedCollectionId, searchQuery, activeWorkbenchTab, selectedExecutionId, mapReverse, mapDepth]);
+  }, [tabs, activeTabId, activeNav, selectedCollectionId, searchQuery, activeWorkbenchTab, selectedExecutionId, selectedWorkflowExecutionId, selectedWorkflowId, mapReverse, mapDepth]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
-        if (event.shiftKey) {
+        if (activeNav === 'Workflows') {
+          saveWorkflow();
+        } else if (event.shiftKey) {
           void handleSaveAs();
         } else {
           void handleSave();
@@ -332,7 +444,7 @@ export default function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activePrompt, activeTabId]);
+  }, [activePrompt, activeTabId, activeNav, workflowDraft]);
 
   const resolvedByType = useMemo(() => {
     const map = new Map<string, PromptPreviewModel['resolvedContext'][number]>();
@@ -371,6 +483,11 @@ export default function App() {
   const activeProvider = providers.find(provider => provider.id === activePrompt?.providerId) ?? providers[0];
   const activeModel = activeProvider?.models.find(model => model.id === activePrompt?.modelId) ?? activeProvider?.models[0];
   const selectedExecution = executionHistory.find(item => item.id === selectedExecutionId) ?? executionHistory[0] ?? null;
+  const activeWorkflow = workflowDraft;
+  const workflowDirty = isWorkflowDirty(workflowDraft, workflowSaved);
+  const selectedWorkflowExecution = workflowHistory.find(item => item.id === selectedWorkflowExecutionId)
+    ?? workflowHistory.find(item => item.workflowId === selectedWorkflowId)
+    ?? null;
 
   function openPromptInTab(prompt: PromptDefinition): void {
     const existing = tabs.find(tab => tab.prompt.id === prompt.id || tab.savedPrompt?.id === prompt.id);
@@ -426,7 +543,7 @@ export default function App() {
     const remaining = tabs.filter(item => item.id !== tabId);
     setTabs(remaining);
     if (tabId === activeTabId) {
-      setActiveTabId(remaining.at(-1)?.id ?? null);
+      setActiveTabId(remaining[remaining.length - 1]?.id ?? null);
       setPreview(null);
     }
   }
@@ -757,6 +874,119 @@ export default function App() {
     postMessage({ type: 'collection.removePrompt', payload: { collectionId: collection.id, promptId: prompt.id } });
   }
 
+  function handleSelectNav(nav: string): void {
+    setActiveNav(nav);
+    if (nav === 'Workflows' && !workflowDraft && workflows[0]) {
+      selectWorkflow(workflows[0], false);
+    }
+  }
+
+  function selectWorkflow(workflow: Workflow, confirmDiscard = true): void {
+    if (
+      confirmDiscard
+      && workflowDraft
+      && workflowDraft.id !== workflow.id
+      && isWorkflowDirty(workflowDraft, workflowSaved)
+      && !window.confirm(`Discard unsaved changes to ${workflowDraft.name}?`)
+    ) return;
+
+    setSelectedWorkflowId(workflow.id);
+    setWorkflowDraft(cloneWorkflow(workflow));
+    setWorkflowSaved(cloneWorkflow(workflow));
+    setStreamingStepOutputs({});
+    setActiveNav('Workflows');
+    setWorkflowView('run');
+    setError('');
+  }
+
+  function createWorkflow(): void {
+    pendingWorkflowActionRef.current = 'first';
+    setActiveNav('Workflows');
+    postMessage({ type: 'workflow.create', payload: { name: 'Untitled Workflow' } });
+  }
+
+  function importWorkflow(): void {
+    pendingWorkflowActionRef.current = 'first';
+    setActiveNav('Workflows');
+    postMessage({ type: 'workflow.import' });
+  }
+
+  function saveWorkflow(): void {
+    if (!workflowDraft) return;
+    pendingWorkflowActionRef.current = 'refresh-current';
+    setIsSaving(true);
+    postMessage({ type: 'workflow.save', payload: { workflow: workflowDraft } });
+  }
+
+  function duplicateWorkflow(): void {
+    if (!workflowDraft) return;
+    pendingWorkflowActionRef.current = 'first';
+    postMessage({ type: 'workflow.duplicate', payload: { workflowId: workflowDraft.id } });
+  }
+
+  function deleteWorkflow(): void {
+    if (!workflowDraft || !window.confirm(`Delete workflow ${workflowDraft.name}? This cannot be undone.`)) return;
+    pendingWorkflowActionRef.current = 'first';
+    postMessage({ type: 'workflow.delete', payload: { workflowId: workflowDraft.id } });
+  }
+
+  function exportWorkflow(): void {
+    if (workflowDraft) postMessage({ type: 'workflow.export', payload: { workflowId: workflowDraft.id } });
+  }
+
+  function addWorkflowStep(): void {
+    if (!workflowDraft) return;
+    const stepId = `workflow-step-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setWorkflowDraft({
+      ...workflowDraft,
+      updatedAt: Date.now(),
+      steps: [...workflowDraft.steps, { id: stepId, name: `Step ${workflowDraft.steps.length + 1}`, enabled: true }],
+    });
+  }
+
+  function deleteWorkflowStep(stepId: string): void {
+    if (!workflowDraft) return;
+    setWorkflowDraft({ ...workflowDraft, updatedAt: Date.now(), steps: workflowDraft.steps.filter(step => step.id !== stepId) });
+  }
+
+  function moveWorkflowStep(stepId: string, direction: -1 | 1): void {
+    if (!workflowDraft) return;
+    const index = workflowDraft.steps.findIndex(step => step.id === stepId);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= workflowDraft.steps.length) return;
+    const steps = [...workflowDraft.steps];
+    [steps[index], steps[target]] = [steps[target], steps[index]];
+    setWorkflowDraft({ ...workflowDraft, steps, updatedAt: Date.now() });
+  }
+
+  function runWorkflow(): void {
+    if (!workflowDraft || runningWorkflowExecutionId) return;
+    setRunningWorkflowExecutionId('pending');
+    setStreamingStepOutputs({});
+    setWorkflowView('run');
+    postMessage({ type: 'workflow.run', payload: { workflow: workflowDraft } });
+  }
+
+  function cancelWorkflow(): void {
+    if (!runningWorkflowExecutionId || runningWorkflowExecutionId === 'pending') return;
+    postMessage({ type: 'workflow.cancel', payload: { executionId: runningWorkflowExecutionId } });
+  }
+
+  function selectWorkflowExecution(executionId: string): void {
+    setSelectedWorkflowExecutionId(executionId);
+    setWorkflowView('run');
+  }
+
+  function deleteWorkflowExecution(executionId: string): void {
+    postMessage({ type: 'workflow.history.delete', payload: { executionId } });
+  }
+
+  function clearWorkflowHistory(): void {
+    if (!window.confirm('Clear workflow execution history?')) return;
+    postMessage({ type: 'workflow.history.clear' });
+    setSelectedWorkflowExecutionId(null);
+  }
+
   const tabItems = tabs.map(tab => ({ id: tab.id, title: tab.prompt.name || 'Untitled Prompt', dirty: isTabDirty(tab) }));
 
   return (
@@ -767,20 +997,27 @@ export default function App() {
           <div className="brand-subtitle">AI Workflow Studio</div>
         </div>
         <div className="topbar-actions topbar-actions-wrap">
-          <button type="button" className="button-secondary" onClick={handleCreatePrompt}>New</button>
-          <button type="button" className="button-secondary" onClick={() => void handleSave()} disabled={!activePrompt || isSaving}>
-            {isSaving ? 'Saving...' : 'Save'}
-          </button>
-          <button type="button" className="button-secondary" onClick={() => void handleSaveAs()} disabled={!activePrompt || isSaving}>Save As</button>
-          <button type="button" className="button-secondary" onClick={handleDuplicatePrompt} disabled={!activePrompt}>Duplicate</button>
-          <button type="button" className="button-secondary" onClick={handleFavoriteToggle} disabled={!activePrompt || activePrompt.source !== 'workspace'}>
-            {activePrompt?.favorite ? 'Unfavorite' : 'Favorite'}
-          </button>
-          <button type="button" className="button-secondary" onClick={handleExportPrompt} disabled={!activePrompt}>Export</button>
-          <button type="button" className="button-secondary danger-text" onClick={handleDeletePrompt} disabled={!activePrompt}>Delete</button>
-          <button type="button" className="button-primary" onClick={runPrompt} disabled={!activePrompt || isRunning}>
-            {isRunning ? 'Running...' : 'Run Prompt'}
-          </button>
+          {activeNav === 'Workflows' ? (
+            <>
+              <button type="button" className="button-secondary" onClick={createWorkflow}>New Workflow</button>
+              <button type="button" className="button-secondary" onClick={saveWorkflow} disabled={!activeWorkflow || isSaving}>{isSaving ? 'Saving...' : 'Save Workflow'}</button>
+              <button type="button" className="button-secondary" onClick={duplicateWorkflow} disabled={!activeWorkflow}>Duplicate</button>
+              <button type="button" className="button-secondary" onClick={exportWorkflow} disabled={!activeWorkflow}>Export</button>
+              <button type="button" className="button-secondary danger-text" onClick={deleteWorkflow} disabled={!activeWorkflow}>Delete</button>
+              <button type="button" className="button-primary" onClick={runWorkflow} disabled={!activeWorkflow || Boolean(runningWorkflowExecutionId)}>{runningWorkflowExecutionId ? 'Running...' : 'Run Workflow'}</button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="button-secondary" onClick={handleCreatePrompt}>New</button>
+              <button type="button" className="button-secondary" onClick={() => void handleSave()} disabled={!activePrompt || isSaving}>{isSaving ? 'Saving...' : 'Save'}</button>
+              <button type="button" className="button-secondary" onClick={() => void handleSaveAs()} disabled={!activePrompt || isSaving}>Save As</button>
+              <button type="button" className="button-secondary" onClick={handleDuplicatePrompt} disabled={!activePrompt}>Duplicate</button>
+              <button type="button" className="button-secondary" onClick={handleFavoriteToggle} disabled={!activePrompt || activePrompt.source !== 'workspace'}>{activePrompt?.favorite ? 'Unfavorite' : 'Favorite'}</button>
+              <button type="button" className="button-secondary" onClick={handleExportPrompt} disabled={!activePrompt}>Export</button>
+              <button type="button" className="button-secondary danger-text" onClick={handleDeletePrompt} disabled={!activePrompt}>Delete</button>
+              <button type="button" className="button-primary" onClick={runPrompt} disabled={!activePrompt || isRunning}>{isRunning ? 'Running...' : 'Run Prompt'}</button>
+            </>
+          )}
         </div>
       </header>
 
@@ -789,17 +1026,22 @@ export default function App() {
           prompts={prompts}
           visiblePrompts={visiblePrompts}
           collections={collections}
+          workflows={workflows}
           activePromptId={activePrompt?.id}
+          activeWorkflowId={selectedWorkflowId}
           activeNav={activeNav}
           searchQuery={searchQuery}
           selectedCollectionId={selectedCollectionId}
           activePromptForCollection={activePrompt}
           getCollectionPrompts={getCollectionPrompts}
           onSelectPrompt={openPromptInTab}
-          onSelectNav={setActiveNav}
+          onSelectNav={handleSelectNav}
           onSearchChange={setSearchQuery}
           onCreatePrompt={handleCreatePrompt}
           onImport={handleImport}
+          onCreateWorkflow={createWorkflow}
+          onImportWorkflow={importWorkflow}
+          onSelectWorkflow={selectWorkflow}
           onCreateCollection={createCollection}
           onRenameCollection={renameCollection}
           onDeleteCollection={deleteCollection}
@@ -810,6 +1052,40 @@ export default function App() {
         />
 
         <main className="studio-main">
+          {activeNav === 'Workflows' ? (
+            <>
+              {activeWorkflow ? (
+                <WorkflowBuilder
+                  workflow={activeWorkflow}
+                  prompts={prompts}
+                  providers={providers}
+                  dirty={workflowDirty}
+                  onChange={setWorkflowDraft}
+                  onDeleteStep={deleteWorkflowStep}
+                  onAddStep={addWorkflowStep}
+                  onMoveStep={moveWorkflowStep}
+                />
+              ) : (
+                <section className="editor-panel empty-panel">
+                  <h1>No workflow selected</h1>
+                  <p>Create or select a workflow to continue.</p>
+                </section>
+              )}
+
+              <section className="workbench-panel">
+                <div className="workbench-tabs" role="tablist" aria-label="Workflow execution tabs">
+                  <button type="button" className={`workbench-tab${workflowView === 'run' ? ' is-active' : ''}`} onClick={() => setWorkflowView('run')}>Run Output</button>
+                  <button type="button" className={`workbench-tab${workflowView === 'history' ? ' is-active' : ''}`} onClick={() => setWorkflowView('history')}>History</button>
+                </div>
+                {workflowView === 'run' ? (
+                  <WorkflowRunPanel record={runningWorkflowExecutionId ? null : selectedWorkflowExecution} runningExecutionId={runningWorkflowExecutionId} streamingStepOutputs={streamingStepOutputs} onCancel={cancelWorkflow} />
+                ) : (
+                  <WorkflowHistoryPanel history={workflowHistory} selectedExecutionId={selectedWorkflowExecutionId} onSelect={selectWorkflowExecution} onDelete={deleteWorkflowExecution} onClear={clearWorkflowHistory} />
+                )}
+              </section>
+            </>
+          ) : (
+            <>
           <PromptTabs tabs={tabItems} activeTabId={activeTabId} onSelectTab={focusTab} onCloseTab={closeTab} />
 
           {!activePrompt && (
@@ -898,9 +1174,20 @@ export default function App() {
               </div>
             </>
           )}
+            </>
+          )}
         </main>
 
-        {activePrompt ? (
+        {activeNav === 'Workflows' ? (
+          <aside className="context-builder context-builder-empty">
+            <div className="context-builder-header">
+              <div>
+                <h2>Workflow Context</h2>
+                <p>Each step inherits its prompt context unless it defines step-specific context bindings.</p>
+              </div>
+            </div>
+          </aside>
+        ) : activePrompt ? (
           <ContextBuilder
             context={activePrompt.context}
             unsupportedContextTypes={unsupportedContextTypes}
