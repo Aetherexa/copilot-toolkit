@@ -85,7 +85,7 @@ jobs:
         run: npx @vscode/vsce verify-pat imsp-vibe-Coder-2596 --azure-credential
 
       - name: Publish to VS Code Marketplace
-        run: npx @vscode/vsce publish --azure-credential --packagePath "copilot-toolkit-${RELEASE_TAG}.vsix"
+        run: npx @vscode/vsce publish --azure-credential --skip-duplicate --packagePath "copilot-toolkit-${RELEASE_TAG}.vsix"
 
       - name: Upload release build artifact
         uses: actions/upload-artifact@v7
@@ -97,13 +97,20 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$RELEASE_TAG" \
-            "copilot-toolkit-$RELEASE_TAG.vsix" \
-            "copilot-toolkit-$RELEASE_TAG.vsix.sha256" \
-            --verify-tag \
-            --generate-notes \
-            --title "Copilot Toolkit $RELEASE_TAG"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              "copilot-toolkit-$RELEASE_TAG.vsix" \
+              "copilot-toolkit-$RELEASE_TAG.vsix.sha256" \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              "copilot-toolkit-$RELEASE_TAG.vsix" \
+              "copilot-toolkit-$RELEASE_TAG.vsix.sha256" \
+              --verify-tag \
+              --generate-notes \
+              --title "Copilot Toolkit $RELEASE_TAG"
+          fi
