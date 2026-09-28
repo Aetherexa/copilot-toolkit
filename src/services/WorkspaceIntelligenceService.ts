@@ -10,6 +10,7 @@ export class WorkspaceIntelligenceService {
   readonly indexer = new WorkspaceIndexer([new JsTsLanguageAnalyzer()], new FallbackLanguageAnalyzer());
   readonly graphQuery = new GraphQueryService(this.indexer);
   private readonly statusEmitter = new vscode.EventEmitter<IndexingStatus>();
+  private initialization: Promise<void> | undefined;
   readonly onDidChangeStatus = this.statusEmitter.event;
 
   constructor(
@@ -40,10 +41,20 @@ export class WorkspaceIntelligenceService {
         void this.upsertPath(file.newUri.fsPath);
       }
     }));
-    void this.initialize();
   }
 
-  async initialize(): Promise<void> {
+  ensureInitialized(): Promise<void> {
+    if (!this.initialization) {
+      this.initialization = this.initialize().finally(() => {
+        if (this.indexer.getStatus().state === 'error') {
+          this.initialization = undefined;
+        }
+      });
+    }
+    return this.initialization;
+  }
+
+  private async initialize(): Promise<void> {
     try {
       const files = await this.workspaceIndex.getWorkspaceFiles();
       const indexed = [] as Array<Parameters<WorkspaceIndexer['initialize']>[0][number]>;
@@ -92,7 +103,8 @@ export class WorkspaceIntelligenceService {
     this.statusEmitter.fire(this.getStatus());
   }
 
-  getMapView(filePath: string, depth: number, reverse: boolean): GraphView {
+  async getMapView(filePath: string, depth: number, reverse: boolean): Promise<GraphView> {
+    await this.ensureInitialized();
     return this.graphQuery.buildDependencyGraph(filePath, depth, reverse);
   }
 
