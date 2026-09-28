@@ -10,8 +10,12 @@ export class ContextEngine {
     private readonly tokenEstimator: TokenEstimator,
   ) {}
 
-  async resolve(bindings: ContextBinding[], budgetTokens = 1800): Promise<ContextResolutionSummary> {
-    const resolved: ResolvedContext[] = [];
+  async resolve(
+    bindings: ContextBinding[],
+    budgetTokens = 1800,
+    additionalContext: ResolvedContext[] = [],
+  ): Promise<ContextResolutionSummary> {
+    const resolved: ResolvedContext[] = [...additionalContext];
 
     for (const binding of bindings) {
       if (!binding.enabled) {
@@ -96,9 +100,10 @@ export class ContextEngine {
         return { ...item, status: 'included' };
       }
 
-      const allowedCharacters = Math.max(0, remaining * 4);
-      if (remaining >= 80 && item.content.length > allowedCharacters) {
-        const content = `${item.content.slice(0, allowedCharacters)}\n\n[Trimmed to fit budget]`;
+      const trimSuffix = '\n\n[Trimmed to fit budget]';
+      const allowedCharacters = Math.max(0, (remaining * 4) - trimSuffix.length);
+      if (remaining >= 80 && allowedCharacters > 0 && item.content.length > allowedCharacters) {
+        const content = `${item.content.slice(0, allowedCharacters)}${trimSuffix}`;
         const tokenEstimate = this.tokenEstimator.estimate(content);
         remaining = Math.max(0, remaining - tokenEstimate);
         return {

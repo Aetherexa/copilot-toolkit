@@ -122,8 +122,9 @@
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
-		"compile": "npm run compile:extension && npm run build:webview",
+		"compile": "npm run compile:extension && npm run typecheck:webview && npm run build:webview",
 		"compile:extension": "tsc -p ./",
+		"typecheck:webview": "tsc -p webview-ui/tsconfig.json --noEmit",
 		"build:webview": "vite build --config webview-ui/vite.config.ts",
 		"watch": "tsc -watch -p ./",
 		"lint": "eslint src",

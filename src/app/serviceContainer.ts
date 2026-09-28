@@ -55,7 +55,7 @@ export interface ServiceContainer {
   readonly graphQuery: GraphQueryService;
   readonly unsupportedContextTypes: string[];
   loadBootstrap(): Promise<StudioBootstrapPayload>;
-  toBootstrap(snapshot: PromptRepositorySnapshot, activePromptId?: string): StudioBootstrapPayload;
+  toBootstrap(snapshot: PromptRepositorySnapshot, workflows: Workflow[], activePromptId?: string): StudioBootstrapPayload;
   buildPreview(prompt: PromptDefinition): Promise<PromptPreview>;
   runPrompt(prompt: PromptDefinition, onProgress: Parameters<ExecutionEngine['runPrompt']>[1]): Promise<ExecutionRunResult>;
 }

@@ -52,7 +52,7 @@ function buildStepPrompt(step: WorkflowStep, promptDefinition: PromptDefinition 
 }
 
 export class WorkflowEngine {
-  private readonly active = new Map<string, { cancelled: boolean }>();
+  private readonly active = new Map<string, { cancelled: boolean; currentExecutionId?: string }>();
 
   constructor(
     private readonly context: ExtensionContext,
@@ -106,6 +106,7 @@ export class WorkflowEngine {
         try {
           const prepared = await this.executionEngine.preparePrompt(stepPrompt, extraContext);
           const run = await this.executionEngine.executePreparedPrompt(stepPrompt, prepared, event => {
+            control.currentExecutionId = event.executionId || control.currentExecutionId;
             if (event.chunk) {
               onProgress({
                 executionId,
@@ -117,6 +118,7 @@ export class WorkflowEngine {
               });
             }
           });
+          control.currentExecutionId = undefined;
 
           const stepRecord: WorkflowStepExecutionRecord = {
             stepId: step.id,
@@ -206,6 +208,9 @@ export class WorkflowEngine {
       return false;
     }
     control.cancelled = true;
+    if (control.currentExecutionId) {
+      this.executionEngine.cancel(control.currentExecutionId);
+    }
     return true;
   }
 }
