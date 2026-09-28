@@ -1,5 +1,9 @@
 ﻿# 🧠 Copilot Toolkit — AI-Powered Developer Productivity Intelligence
 
+[![CI](https://github.com/Aetherexa/copilot-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Aetherexa/copilot-toolkit/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Aetherexa/copilot-toolkit/actions/workflows/codeql.yml/badge.svg)](https://github.com/Aetherexa/copilot-toolkit/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > **Stop guessing. Start measuring.**
 > The only AI code assistant that tracks what actually happened — not just what it suggested.
 
@@ -455,6 +459,46 @@ Copilot Toolkit is built on a **modular, event-driven, metrics-based architectur
 | `copilotToolkit.skillFile` | `.github/copilot-instructions.md` | Default skill and instructions file |
 | `copilotToolkit.skillsFolder` | `.copilot/skills` | Folder containing selectable skill `.md` files |
 | `copilotToolkit.enableLearning` | `true` | Enable adaptive skill recommendation learning |
+
+---
+
+## 🧪 Development & Quality Gates
+
+The repository uses automated checks on every pull request and supported branch push.
+
+### Local validation
+
+```bash
+npm ci
+npm run compile
+npm test
+npm run test:coverage
+npx @vscode/vsce package --no-dependencies
+```
+
+The CI pipeline currently verifies:
+
+- Extension TypeScript compilation
+- React webview TypeScript checking and Vite build
+- Unit tests on Node.js 20 and 22
+- Native Node test coverage reporting
+- Critical dependency vulnerability audit
+- VSIX packaging
+- CodeQL JavaScript/TypeScript security and quality analysis
+- Dependabot updates for npm packages and GitHub Actions
+
+CI also uploads the generated VSIX as a short-lived workflow artifact so pull requests can be smoke-tested before merge.
+
+### Releases
+
+GitHub releases are created from semantic version tags.
+
+1. Update `package.json` to the intended version.
+2. Merge the validated change to `main`.
+3. Create and push the matching tag, for example `v1.2.5`.
+4. The Release workflow rebuilds, tests, packages the VSIX, generates a SHA-256 checksum, and publishes both files to the GitHub Release.
+
+The release workflow rejects a tag when it does not match the version in `package.json`.
 
 ---
 
