@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to release, for example v1.2.5
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish GitHub release
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify tag matches package version
+        run: |
+          node -e "const p=require('./package.json'); const expected='v'+p.version; if (process.env.RELEASE_TAG !== expected) { console.error('Tag '+process.env.RELEASE_TAG+' does not match package version '+expected); process.exit(1); }"
+
+      - name: Compile and typecheck
+        run: npm run compile
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Package VSIX
+        run: npx @vscode/vsce package --no-dependencies --out copilot-toolkit-${RELEASE_TAG}.vsix
+
+      - name: Create checksum
+        run: sha256sum copilot-toolkit-${RELEASE_TAG}.vsix > copilot-toolkit-${RELEASE_TAG}.vsix.sha256
+
+      - name: Upload release build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: copilot-toolkit-${{ env.RELEASE_TAG }}
+          path: |
+            copilot-toolkit-${{ env.RELEASE_TAG }}.vsix
+            copilot-toolkit-${{ env.RELEASE_TAG }}.vsix.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG"             "copilot-toolkit-$RELEASE_TAG.vsix"             "copilot-toolkit-$RELEASE_TAG.vsix.sha256"             --verify-tag             --generate-notes             --title "Copilot Toolkit $RELEASE_TAG"
