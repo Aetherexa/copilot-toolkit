@@ -32,7 +32,7 @@ Create a dedicated identity for Marketplace publishing, for example:
 copilot-toolkit-marketplace-publisher
 ```
 
-Place it in an Azure subscription/resource group controlled by the project owner and grant only the Azure permissions required for the identity to exist and authenticate. Microsoft's VS Code publishing guidance recommends Microsoft Entra authentication and workload identity federation rather than global Azure DevOps PATs.
+Place it in an Azure subscription/resource group controlled by the project owner. Microsoft's VS Code publishing guidance uses a user-assigned managed identity with Reader access and recommends Microsoft Entra authentication plus workload identity federation instead of global Azure DevOps PATs. Global Azure DevOps PATs are scheduled for retirement on December 1, 2026.
 
 Record:
 
@@ -93,7 +93,7 @@ AZURE_TENANT_ID
 AZURE_SUBSCRIPTION_ID
 ```
 
-There is intentionally no `VSCE_PAT` secret.
+There is intentionally no `VSCE_PAT` secret. The workflow also pins Azure Identity to `AzureCliCredential` after `azure/login@v3`, so the publisher step cannot silently fall through to an unrelated interactive credential.
 
 ## Publishing
 
