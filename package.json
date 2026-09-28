@@ -128,7 +128,9 @@
 		"build:webview": "vite build --config webview-ui/vite.config.ts",
 		"watch": "tsc -watch -p ./",
 		"lint": "eslint src",
-		"test": "npm run compile:extension && node --test out/test/*.test.js"
+		"test": "npm run compile:extension && node --test out/test/*.test.js",
+		"test:coverage": "npm run compile:extension && node --test --experimental-test-coverage out/test/*.test.js",
+		"quality": "npm run compile && npm run test:coverage"
 	},
 	"dependencies": {
 		"react": "^18.3.1",
