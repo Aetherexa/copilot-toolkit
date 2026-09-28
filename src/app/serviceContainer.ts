@@ -17,6 +17,7 @@ import { RecentCommitsResolver } from '../context/resolvers/RecentCommitsResolve
 import { RelatedFilesResolver } from '../context/resolvers/RelatedFilesResolver';
 import { RelatedTestsResolver } from '../context/resolvers/RelatedTestsResolver';
 import { WorkspaceSummaryResolver } from '../context/resolvers/WorkspaceSummaryResolver';
+import { ContextBinding, ContextType } from '../domain/context';
 import { PromptExecutionRequest, PromptExecutionResult } from '../domain/execution';
 import { StudioBootstrapPayload } from '../domain/messages';
 import { PromptDefinition, PromptPreview, PromptRepositorySnapshot } from '../domain/prompt';
@@ -63,6 +64,21 @@ export interface ServiceContainer {
 const FUTURE_CONTEXT_TYPES = [
   'relatedApis',
 ];
+
+const WORKSPACE_CONTEXT_TYPES = new Set<ContextType>([
+  'openEditors',
+  'currentFolder',
+  'relatedFiles',
+  'relatedTests',
+  'workspaceSummary',
+  'architectureSummary',
+  'dependencyGraph',
+  'currentFeature',
+]);
+
+function needsWorkspaceIntelligence(bindings: ContextBinding[]): boolean {
+  return bindings.some(binding => binding.enabled && WORKSPACE_CONTEXT_TYPES.has(binding.type));
+}
 
 function registerProviders(providerRegistry: ProviderRegistry): RegisteredProvider {
   const copilotProvider = new CopilotChatProvider(providerRegistryContext!);
@@ -117,6 +133,11 @@ export function createServiceContainer(context: vscode.ExtensionContext): Servic
       languageId: vscode.window.activeTextEditor?.document.languageId ?? 'plaintext',
       fileName: vscode.window.activeTextEditor?.document.fileName.split(/[\\/]/).pop() ?? 'unknown',
     }),
+    async prompt => {
+      if (needsWorkspaceIntelligence(prompt.context)) {
+        await workspaceIntelligence.ensureInitialized();
+      }
+    },
   );
   const workflowEngine = new WorkflowEngine(
     context,
@@ -158,10 +179,14 @@ export function createServiceContainer(context: vscode.ExtensionContext): Servic
     unsupportedContextTypes: FUTURE_CONTEXT_TYPES,
     async loadBootstrap(): Promise<StudioBootstrapPayload> {
       await providerRegistry.refresh();
+      void workspaceIntelligence.ensureInitialized();
       return toBootstrap((await promptRepository.loadSnapshot()), (await workflowRepository.loadSnapshot()).workflows);
     },
     toBootstrap,
     async buildPreview(prompt: PromptDefinition): Promise<PromptPreview> {
+      if (needsWorkspaceIntelligence(prompt.context)) {
+        await workspaceIntelligence.ensureInitialized();
+      }
       const resolution = await contextEngine.resolve(prompt.context, prompt.contextBudgetTokens ?? 1800);
       const assembledPrompt = promptAssembler.assemble(prompt, resolution.items);
       return {
