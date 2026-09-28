@@ -27,6 +27,7 @@ jobs:
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
       AZURE_CORE_OUTPUT: none
+      AZURE_TOKEN_CREDENTIALS: AzureCliCredential
 
     steps:
       - name: Checkout release tag
