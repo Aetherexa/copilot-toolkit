@@ -145,7 +145,7 @@
 		"@vscode/vsce": "^3.9.1",
 		"sharp": "^0.34.5",
 		"typescript": "^5.4.0",
-		"vite": "^5.4.8"
+		"vite": "^8.3.1"
 	},
 	"extensionDependencies": []
 }
