@@ -575,7 +575,7 @@ export class PromptStudioPanel {
     this.postMessage({
       type: 'graph.viewResult',
       payload: {
-        view: this.services.workspaceIntelligence.getMapView(activeFilePath, message.payload.depth, message.payload.reverse),
+        view: await this.services.workspaceIntelligence.getMapView(activeFilePath, message.payload.depth, message.payload.reverse),
         status: this.services.workspaceIntelligence.getStatus(),
       },
     });
