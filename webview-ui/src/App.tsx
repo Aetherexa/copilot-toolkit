@@ -432,7 +432,9 @@ export default function App() {
     const handler = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
-        if (event.shiftKey) {
+        if (activeNav === 'Workflows') {
+          saveWorkflow();
+        } else if (event.shiftKey) {
           void handleSaveAs();
         } else {
           void handleSave();
@@ -442,7 +444,7 @@ export default function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activePrompt, activeTabId]);
+  }, [activePrompt, activeTabId, activeNav, workflowDraft]);
 
   const resolvedByType = useMemo(() => {
     const map = new Map<string, PromptPreviewModel['resolvedContext'][number]>();
@@ -972,7 +974,7 @@ export default function App() {
 
   function selectWorkflowExecution(executionId: string): void {
     setSelectedWorkflowExecutionId(executionId);
-    setWorkflowView('history');
+    setWorkflowView('run');
   }
 
   function deleteWorkflowExecution(executionId: string): void {
