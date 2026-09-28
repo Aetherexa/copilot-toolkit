@@ -79,7 +79,7 @@ export class WorkflowEngine {
     onProgress: (event: WorkflowExecutionProgress) => void,
   ): Promise<WorkflowExecutionResult> {
     const executionId = createId();
-    const control = { cancelled: false };
+    const control: { cancelled: boolean; currentExecutionId?: string } = { cancelled: false };
     this.active.set(executionId, control);
     const startedAt = Date.now();
     const stepRecords: WorkflowStepExecutionRecord[] = [];
