@@ -258,6 +258,41 @@ Recommendation: Focus on error-handling skill to push
 
 Search for **"Copilot Toolkit"** in the VS Code Extensions Marketplace, or install from a `.vsix` file manually:
 
+---
+
+## Copilot Toolkit 2.0 Sprint 1
+
+Sprint 1 introduces a persistent **AI Workflow Studio** while preserving the current QuickPick-first workflow, analytics, fix suggestion, and prompt/skill loading behavior.
+
+### New command
+
+- `Copilot Toolkit: Open AI Workflow Studio`
+
+### Architecture
+
+```text
+Extension Host
+  -> Domain Services
+  -> Context Engine
+  -> Provider Layer
+  -> React Workflow Studio
+```
+
+### Developer workflow
+
+1. `npm install`
+2. `npm run compile`
+3. Press `F5` to open an Extension Development Host.
+
+The build now compiles both the extension host and the React/Vite webview into `media/studio`.
+
+### Sprint 1 supported Studio context
+
+- Current File
+- Selected Code
+
+Other Context Builder items are visible as planned placeholders and are documented in [docs/workflow-studio-sprint1.md](docs/workflow-studio-sprint1.md).
+
 ```
 Extensions panel  (Ctrl+Shift+X)
   → ⋯  (More Actions)

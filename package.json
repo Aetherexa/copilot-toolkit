@@ -6,7 +6,8 @@
 	"publisher": "imsp-vibe-Coder-2596",
 	"icon": "assets/icon.png",
 	"activationEvents": [
-		"onCommand:copilot.openToolkit",
+		"onCommand:copilot-toolkit.open",
+		"onCommand:copilot-toolkit.openStudio",
 		"onStartupFinished"
 	],
 	"engines": {
@@ -52,6 +53,10 @@
 			{
 				"command": "copilot-toolkit.open",
 				"title": "Copilot Toolkit"
+			},
+			{
+				"command": "copilot-toolkit.openStudio",
+				"title": "Copilot Toolkit: Open AI Workflow Studio"
 			},
 			{
 				"command": "copilot-toolkit.resetLearning",
@@ -117,16 +122,27 @@
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
-		"compile": "tsc -p ./",
+		"compile": "npm run compile:extension && npm run build:webview",
+		"compile:extension": "tsc -p ./",
+		"build:webview": "vite build --config webview-ui/vite.config.ts",
 		"watch": "tsc -watch -p ./",
-		"lint": "eslint src"
+		"lint": "eslint src",
+		"test": "npm run compile:extension && node --test out/test/**/*.test.js"
+	},
+	"dependencies": {
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1"
 	},
 	"devDependencies": {
+		"@types/react": "^18.3.18",
+		"@types/react-dom": "^18.3.5",
+		"@vitejs/plugin-react": "^4.3.1",
 		"@types/node": "^20.0.0",
 		"@types/vscode": "^1.90.0",
 		"@vscode/vsce": "^3.9.1",
 		"sharp": "^0.34.5",
-		"typescript": "^5.4.0"
+		"typescript": "^5.4.0",
+		"vite": "^5.4.8"
 	},
 	"extensionDependencies": []
 }
