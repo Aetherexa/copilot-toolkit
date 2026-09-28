@@ -8,6 +8,8 @@ import { showFixSuggestion } from './ui/fixSuggestion';
 import { activateEditTracker } from './services/editTracker';
 import { logEvent, flushToState } from './services/logger';
 import { applyFixCommand } from './commands/applyFix';
+import { createServiceContainer } from './app/serviceContainer';
+import { registerStudioCommands } from './app/registerCommands';
 
 // ─── Prompt item type ─────────────────────────────────────────────────────────
 
@@ -879,9 +881,11 @@ async function selectMode(): Promise<ModeItem | undefined> {
 
 export function activate(context: vscode.ExtensionContext): void {
   const state = context.globalState;
+  const services = createServiceContainer(context);
 
   // ── Edit tracker (must be first so it catches all edits) ───────────────────
   context.subscriptions.push(activateEditTracker(context));
+  registerStudioCommands(context, services);
 
   // ── Reset learning command ──────────────────────────────────────────────
   context.subscriptions.push(

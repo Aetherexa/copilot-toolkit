@@ -39,6 +39,13 @@ export interface ExecutionEvent {
   timeSavedMinutes: number;
   issuesDetected: number;   // estimated from prompt type
   fixesApplied: number;     // incremented when user runs a fix-oriented prompt
+  providerId?: string;
+  modelId?: string;
+  success?: boolean;
+  durationMs?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  contextItems?: number;
 }
 
 export interface DailySummary {
@@ -144,6 +151,13 @@ export async function recordExecution(
     promptLabel: string;
     languageId: string;
     fileName: string;
+    providerId?: string;
+    modelId?: string;
+    success?: boolean;
+    durationMs?: number;
+    inputTokens?: number;
+    outputTokens?: number;
+    contextItems?: number;
   }
 ): Promise<void> {
   const data = loadAnalytics(state);
@@ -163,6 +177,13 @@ export async function recordExecution(
     timeSavedMinutes: timeSaved,
     issuesDetected: issues,
     fixesApplied: fixes,
+    providerId: params.providerId,
+    modelId: params.modelId,
+    success: params.success,
+    durationMs: params.durationMs,
+    inputTokens: params.inputTokens,
+    outputTokens: params.outputTokens,
+    contextItems: params.contextItems,
   };
 
   data.events.push(event);

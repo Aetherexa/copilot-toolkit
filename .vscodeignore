@@ -6,8 +6,10 @@ node_modules/**
 .gitignore
 .eslintrc*
 tsconfig.json
+webview-ui/**
 **/*.ts
 !out/**
+!media/**
 **/.DS_Store
 .vscodeignore
 assets/banner.png
