@@ -2,6 +2,8 @@
 .vscode-test/**
 .github/**
 docs/**
+CONTRIBUTING.md
+SECURITY.md
 src/**
 scripts/**
 webview-ui/**
