@@ -6,6 +6,8 @@ src/**
 scripts/**
 webview-ui/**
 node_modules/**
+out/test/**
+out/**/*.map
 .gitignore
 .eslintrc*
 tsconfig.json
@@ -13,8 +15,3 @@ tsconfig.json
 **/.DS_Store
 assets/banner.png
 .vscodeignore
-
-!out/**
-out/test/**
-out/**/*.map
-!media/**
