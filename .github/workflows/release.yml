@@ -58,7 +58,7 @@ jobs:
         run: sha256sum copilot-toolkit-${RELEASE_TAG}.vsix > copilot-toolkit-${RELEASE_TAG}.vsix.sha256
 
       - name: Upload release build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: copilot-toolkit-${{ env.RELEASE_TAG }}
           path: |
