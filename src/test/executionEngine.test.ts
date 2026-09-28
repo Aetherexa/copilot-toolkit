@@ -198,7 +198,9 @@ test('ExecutionEngine cancellation updates provider token state', async () => {
     executionId = event.executionId;
   });
 
-  await Promise.resolve();
+  for (let attempt = 0; attempt < 10 && !executionId; attempt += 1) {
+    await Promise.resolve();
+  }
   assert.equal(executionId.length > 0, true);
   assert.equal(engine.cancel(executionId), true);
   release();
