@@ -28,9 +28,10 @@ export class GraphQueryService {
   shortestDependencyPath(sourceFile: string, targetFile: string): string[] {
     const start = normalizeFileEntityId(sourceFile);
     const target = this.resolveGraphFileId(normalizeFileEntityId(targetFile));
-    const relations = this.indexer.getRelations().filter(relation => ['imports', 'dependsOn'].includes(relation.type));
-    const queue: Array<{ id: string; path: string[] }> = [{ id: start, path: [start] }];
-    const visited = new Set<string>([start]);
+    const { forward } = this.buildAdjacency(['imports', 'dependsOn']);
+    const resolvedStart = this.resolveGraphFileId(start);
+    const queue: Array<{ id: string; path: string[] }> = [{ id: resolvedStart, path: [resolvedStart] }];
+    const visited = new Set<string>([resolvedStart]);
 
     while (queue.length > 0) {
       const current = queue.shift()!;
@@ -38,8 +39,7 @@ export class GraphQueryService {
         return current.path;
       }
 
-      for (const relation of relations.filter(item => this.resolveGraphFileId(item.source) === current.id)) {
-        const targetId = this.resolveGraphFileId(relation.target);
+      for (const targetId of forward.get(current.id) ?? []) {
         if (!visited.has(targetId)) {
           visited.add(targetId);
           queue.push({ id: targetId, path: [...current.path, targetId] });
@@ -145,10 +145,11 @@ export class GraphQueryService {
   }
 
   private walk(start: string, depth: number, types: string[]): string[] {
-    const queue: Array<{ id: string; depth: number }> = [{ id: start, depth: 0 }];
-    const visited = new Set<string>([start]);
+    const resolvedStart = this.resolveGraphFileId(start);
+    const queue: Array<{ id: string; depth: number }> = [{ id: resolvedStart, depth: 0 }];
+    const visited = new Set<string>([resolvedStart]);
     const results: string[] = [];
-    const relations = this.indexer.getRelations().filter(relation => types.includes(relation.type));
+    const { forward } = this.buildAdjacency(types);
 
     while (queue.length > 0) {
       const current = queue.shift()!;
@@ -156,8 +157,7 @@ export class GraphQueryService {
         continue;
       }
 
-      for (const relation of relations.filter(item => item.source === current.id)) {
-        const targetId = this.resolveGraphFileId(relation.target);
+      for (const targetId of forward.get(current.id) ?? []) {
         if (!visited.has(targetId)) {
           visited.add(targetId);
           results.push(targetId);
@@ -170,10 +170,11 @@ export class GraphQueryService {
   }
 
   private walkReverse(start: string, depth: number, types: string[]): string[] {
-    const queue: Array<{ id: string; depth: number }> = [{ id: start, depth: 0 }];
-    const visited = new Set<string>([start]);
+    const resolvedStart = this.resolveGraphFileId(start);
+    const queue: Array<{ id: string; depth: number }> = [{ id: resolvedStart, depth: 0 }];
+    const visited = new Set<string>([resolvedStart]);
     const results: string[] = [];
-    const relations = this.indexer.getRelations().filter(relation => types.includes(relation.type));
+    const { reverse } = this.buildAdjacency(types);
 
     while (queue.length > 0) {
       const current = queue.shift()!;
@@ -181,8 +182,7 @@ export class GraphQueryService {
         continue;
       }
 
-      for (const relation of relations.filter(item => this.resolveGraphFileId(item.target) === current.id)) {
-        const sourceId = this.resolveGraphFileId(relation.source);
+      for (const sourceId of reverse.get(current.id) ?? []) {
         if (!visited.has(sourceId)) {
           visited.add(sourceId);
           results.push(sourceId);
@@ -192,6 +192,33 @@ export class GraphQueryService {
     }
 
     return results;
+  }
+
+  private buildAdjacency(types: string[]): {
+    forward: Map<string, string[]>;
+    reverse: Map<string, string[]>;
+  } {
+    const allowed = new Set(types);
+    const forward = new Map<string, string[]>();
+    const reverse = new Map<string, string[]>();
+
+    for (const relation of this.indexer.getRelations()) {
+      if (!allowed.has(relation.type)) {
+        continue;
+      }
+
+      const source = this.resolveGraphFileId(relation.source);
+      const target = this.resolveGraphFileId(relation.target);
+      const outgoing = forward.get(source) ?? [];
+      outgoing.push(target);
+      forward.set(source, outgoing);
+
+      const incoming = reverse.get(target) ?? [];
+      incoming.push(source);
+      reverse.set(target, incoming);
+    }
+
+    return { forward, reverse };
   }
 
   private toNode(id: string): GraphNodeView | undefined {
