@@ -729,14 +729,23 @@ function buildWorkflowPrompt(skill: string, selectedPrompts: PromptItem[], code:
 
 // ─── Send to Copilot ──────────────────────────────────────────────────────────
 
-async function sendToCopilot(prompt: string): Promise<void> {
+async function sendToCopilot(prompt: string): Promise<boolean> {
   try {
     await vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
+    return true;
   } catch {
-    await vscode.env.clipboard.writeText(prompt);
-    vscode.window.showInformationMessage(
-      'Copilot Toolkit: Could not open Copilot Chat automatically. The prompt has been copied to your clipboard.',
+    const copyAction = 'Copy Prompt';
+    const choice = await vscode.window.showWarningMessage(
+      'Copilot Toolkit could not open Copilot Chat automatically. Copy the assembled prompt to the clipboard?',
+      copyAction,
     );
+    if (choice !== copyAction) {
+      return false;
+    }
+
+    await vscode.env.clipboard.writeText(prompt);
+    vscode.window.showInformationMessage('Copilot Toolkit: The assembled prompt was copied to your clipboard.');
+    return true;
   }
 }
 
@@ -784,7 +793,9 @@ async function runWorkflowMode(
 
   // Step 3 — build and send
   const finalPrompt = buildWorkflowPrompt(skill, selected, active.code, active.fileName, active.languageId);
-  await sendToCopilot(finalPrompt);
+  if (!await sendToCopilot(finalPrompt)) {
+    return undefined;
+  }
 
   // Extract skill names from merged skill string for analytics
   const skillNames = extractSkillNames(skill);
@@ -974,7 +985,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (!picked) { return; }
 
     const finalPrompt = buildFinalPrompt(skill, picked.body, active.code, active.fileName, active.languageId);
-    await sendToCopilot(finalPrompt);
+    if (!await sendToCopilot(finalPrompt)) { return; }
 
     // Record analytics
     await recordExecution(state, {
