@@ -5,7 +5,7 @@ import { JsTsLanguageAnalyzer } from '../analyzers/JsTsLanguageAnalyzer';
 import { GraphQueryService } from '../services/GraphQueryService';
 import { WorkspaceIndexer } from '../services/WorkspaceIndexer';
 import { WorkspaceFileInfo } from '../services/WorkspaceIndexService';
-import { isTestPath, shouldIndexFile } from '../services/workspaceFileFilters';
+import { isSensitiveFilePath, isTestPath, shouldIndexFile } from '../services/workspaceFileFilters';
 
 function file(relativePath: string, extension = '.ts'): WorkspaceFileInfo {
   return {
@@ -27,6 +27,17 @@ test('workspace file filters ignore generated and large files', () => {
   assert.equal(shouldIndexFile('/repo/dist/app.js', 100), false);
   assert.equal(shouldIndexFile('/repo/src/app.ts', 600000), false);
   assert.equal(shouldIndexFile('/repo/src/app.ts', 100), true);
+});
+
+test('workspace file filters exclude common credential and secret files', () => {
+  assert.equal(isSensitiveFilePath('/repo/.env'), true);
+  assert.equal(isSensitiveFilePath('/repo/.env.production'), true);
+  assert.equal(isSensitiveFilePath('/repo/config/credentials.json'), true);
+  assert.equal(isSensitiveFilePath('/repo/.ssh/id_rsa'), true);
+  assert.equal(isSensitiveFilePath('/repo/certs/client.pem'), true);
+  assert.equal(isSensitiveFilePath('/repo/src/secretService.ts'), false);
+  assert.equal(shouldIndexFile('/repo/config/secrets.json', 100), false);
+  assert.equal(shouldIndexFile('/repo/src/config.json', 100), true);
 });
 
 test('workspace indexer builds entities and relations incrementally', async () => {
