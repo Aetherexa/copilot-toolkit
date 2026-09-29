@@ -11,6 +11,8 @@ import { applyFixCommand } from './commands/applyFix';
 import { createServiceContainer } from './app/serviceContainer';
 import { registerStudioCommands } from './app/registerCommands';
 import { getConfigPath, getWorkspaceRoot } from './app/workspace';
+import { redactSecrets } from './services/SecretRedactor';
+import { isSensitiveFilePath } from './services/workspaceFileFilters';
 
 // ─── Prompt item type ─────────────────────────────────────────────────────────
 
@@ -676,6 +678,7 @@ function loadAllPrompts(): PromptItem[] {
 interface ActiveCode {
   code: string;
   fileName: string;
+  filePath: string;
   languageId: string;
 }
 
@@ -689,8 +692,9 @@ function getActiveCode(): ActiveCode | undefined {
     : editor.document.getText(selection);
 
   const fileName = editor.document.fileName.split(/[\\/]/).pop() ?? 'unknown';
+  const filePath = editor.document.fileName;
   const languageId = editor.document.languageId;
-  return { code, fileName, languageId };
+  return { code, fileName, filePath, languageId };
 }
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
@@ -730,8 +734,9 @@ function buildWorkflowPrompt(skill: string, selectedPrompts: PromptItem[], code:
 // ─── Send to Copilot ──────────────────────────────────────────────────────────
 
 async function sendToCopilot(prompt: string): Promise<boolean> {
+  const sanitizedPrompt = redactSecrets(prompt).text;
   try {
-    await vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
+    await vscode.commands.executeCommand('workbench.action.chat.open', { query: sanitizedPrompt });
     return true;
   } catch {
     const copyAction = 'Copy Prompt';
@@ -743,7 +748,7 @@ async function sendToCopilot(prompt: string): Promise<boolean> {
       return false;
     }
 
-    await vscode.env.clipboard.writeText(prompt);
+    await vscode.env.clipboard.writeText(sanitizedPrompt);
     vscode.window.showInformationMessage('Copilot Toolkit: The assembled prompt was copied to your clipboard.');
     return true;
   }
@@ -951,6 +956,10 @@ export function activate(context: vscode.ExtensionContext): void {
     }
     if (active.code.trim().length === 0) {
       vscode.window.showWarningMessage('Copilot Toolkit: The file or selection is empty.');
+      return;
+    }
+    if (isSensitiveFilePath(active.filePath)) {
+      vscode.window.showWarningMessage('Copilot Toolkit: Sensitive credential files are excluded from AI requests.');
       return;
     }
 
