@@ -97,7 +97,7 @@ export class ContextEngine {
     const seenContent = new Set<string>();
 
     return items.map(item => {
-      const normalizedPath = item.source?.path?.replace(/\\\\/g, '/').toLowerCase();
+      const normalizedPath = item.source?.path?.replace(/\\/g, '/').toLowerCase();
       const selection = item.source?.selection;
       const pathKey = normalizedPath
         ? item.type === 'currentSelection'
