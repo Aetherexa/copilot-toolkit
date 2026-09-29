@@ -7,6 +7,7 @@ import { ContextBinding, ContextResolver, ResolvedContext } from '../domain/cont
 import { PromptDefinition } from '../domain/prompt';
 import { PromptAssembler } from '../prompts/PromptAssembler';
 import { TokenEstimator } from '../services/TokenEstimator';
+import { redactSecrets } from '../services/SecretRedactor';
 
 class StubResolver implements ContextResolver {
   constructor(
@@ -92,6 +93,81 @@ test('ContextEngine preserves binding order across multiple resolvers', async ()
   ]);
 
   assert.deepEqual(result.items.map(item => item.type), ['currentSelection', 'currentFile']);
+});
+
+test('secret redactor removes common credential values before provider assembly', () => {
+  const result = redactSecrets([
+    'API_KEY=super-secret-value',
+    'Authorization: Bearer abc.def.ghi',
+    'github_pat_abcdefghijklmnopqrstuvwxyz123456',
+  ].join('\n'));
+
+  assert.equal(result.redactionCount, 3);
+  assert.doesNotMatch(result.text, /super-secret-value/);
+  assert.doesNotMatch(result.text, /abc\.def\.ghi/);
+  assert.doesNotMatch(result.text, /github_pat_abcdefghijklmnopqrstuvwxyz123456/);
+  assert.match(result.text, /\[REDACTED\]/);
+});
+
+test('ContextEngine excludes sensitive files and redacts secret-like values', async () => {
+  const registry = new ContextRegistry();
+  registry.register(new StubResolver('currentFile', {
+    type: 'currentFile',
+    title: 'Current File',
+    content: 'PASSWORD=do-not-send',
+    tokenEstimate: 5,
+    truncated: false,
+    source: { path: '/repo/.env' },
+  }));
+  registry.register(new StubResolver('gitDiff', {
+    type: 'gitDiff',
+    title: 'Git Diff',
+    content: 'client_secret = visible-secret',
+    tokenEstimate: 5,
+    truncated: false,
+  }));
+  const engine = new ContextEngine(registry, new ContextRanker(), new TokenEstimator());
+
+  const result = await engine.resolve([
+    { type: 'currentFile', enabled: true },
+    { type: 'gitDiff', enabled: true },
+  ]);
+
+  const sensitive = result.items.find(item => item.type === 'currentFile');
+  const diff = result.items.find(item => item.type === 'gitDiff');
+  assert.equal(sensitive?.status, 'excluded');
+  assert.match(sensitive?.excludedReason ?? '', /Sensitive file/);
+  assert.doesNotMatch(diff?.content ?? '', /visible-secret/);
+  assert.match(diff?.content ?? '', /\[REDACTED\]/);
+});
+
+test('ContextEngine deduplicates the same file across context categories', async () => {
+  const registry = new ContextRegistry();
+  registry.register(new StubResolver('relatedFiles', {
+    type: 'relatedFiles',
+    title: 'service.ts',
+    content: 'export const service = 1;',
+    tokenEstimate: 6,
+    truncated: false,
+    source: { path: '/repo/src/service.ts' },
+  }));
+  registry.register(new StubResolver('openEditors', {
+    type: 'openEditors',
+    title: 'service.ts',
+    content: 'export const service = 1;',
+    tokenEstimate: 6,
+    truncated: false,
+    source: { path: '/repo/src/service.ts' },
+  }));
+  const engine = new ContextEngine(registry, new ContextRanker(), new TokenEstimator());
+
+  const result = await engine.resolve([
+    { type: 'relatedFiles', enabled: true },
+    { type: 'openEditors', enabled: true },
+  ]);
+
+  assert.equal(result.items.filter(item => item.status === 'included').length, 1);
+  assert.equal(result.items.filter(item => item.status === 'excluded').length, 1);
 });
 
 test('ContextEngine budgets additional workflow context instead of appending it outside the limit', async () => {
