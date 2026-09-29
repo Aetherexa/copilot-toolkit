@@ -168,6 +168,24 @@ test('ExecutionEngine can persist content when the user explicitly opts in', asy
   assert.equal(stored?.responseText, 'hello world');
 });
 
+test('ExecutionEngine rejects requests that exceed the selected model input limit', async () => {
+  const provider = createProvider({
+    definition: {
+      id: 'github-copilot',
+      name: 'GitHub Copilot',
+      enabled: true,
+      status: 'available',
+      models: [{ id: 'model-1', name: 'Tiny Model', enabled: true, maxInputTokens: 2 }],
+    },
+  });
+  const { engine } = createEngine(provider);
+
+  await assert.rejects(
+    () => engine.runPrompt(createPrompt(), () => undefined),
+    /exceeds the selected model input limit/,
+  );
+});
+
 test('ExecutionEngine rejects unavailable providers', async () => {
   const { engine } = createEngine();
 
