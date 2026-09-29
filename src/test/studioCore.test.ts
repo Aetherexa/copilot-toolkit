@@ -122,7 +122,7 @@ test('ContextEngine excludes sensitive files and redacts secret-like values', as
   registry.register(new StubResolver('gitDiff', {
     type: 'gitDiff',
     title: 'Git Diff',
-    content: 'client_secret = visible-secret',
+    content: 'client_secret: "visible-secret"',
     tokenEstimate: 5,
     truncated: false,
   }));
