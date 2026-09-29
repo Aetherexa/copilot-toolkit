@@ -6,7 +6,8 @@ export interface SecretRedactionResult {
 const REDACTED = '[REDACTED]';
 
 const PREFIX_PATTERNS: RegExp[] = [
-  /((?:^|\r?\n)\s*[A-Z][A-Z0-9_]*(?:SECRET|TOKEN|PASSWORD|PASSWD|API_KEY|ACCESS_KEY|PRIVATE_KEY|CLIENT_SECRET)[A-Z0-9_]*\s*=\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s#]+)/g,
+  /((?:^|\r?\n)\s*[A-Z0-9_]*(?:SECRET|TOKEN|PASSWORD|PASSWD|API_KEY|ACCESS_KEY|PRIVATE_KEY|CLIENT_SECRET)[A-Z0-9_]*\s*=\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s#]+)/g,
+  /(\b[A-Z0-9_]*(?:SECRET|TOKEN|PASSWORD|PASSWD|API_KEY|ACCESS_KEY|PRIVATE_KEY|CLIENT_SECRET)[A-Z0-9_]*\s*=\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[A-Za-z0-9_+./=-]{8,})/g,
   /(\b["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|passwd|private[_-]?key|secret[_-]?access[_-]?key)["']?\s*:\s*)(?:"[^"\r\n]*"|'[^'\r\n]*')/gi,
   /(\bAuthorization\s*:\s*Bearer\s+)([^\s]+)/gi,
 ];
