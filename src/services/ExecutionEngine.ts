@@ -52,6 +52,7 @@ export class ExecutionEngine {
     private readonly cancellationFactory: () => CancellationSourceLike,
     private readonly getEditorSnapshot: () => EditorSnapshot,
     private readonly beforeContextResolve?: (prompt: PromptDefinition) => Promise<void>,
+    private readonly shouldStoreHistoryContent: () => boolean = () => false,
   ) {}
 
   getHistory(): PromptExecutionRecord[] {
@@ -162,7 +163,15 @@ export class ExecutionEngine {
         error: result.error,
       };
 
-      await this.historyStore.save(record);
+      const persistedRecord = this.shouldStoreHistoryContent()
+        ? record
+        : {
+          ...record,
+          requestPreview: '[Content not retained]',
+          responsePreview: undefined,
+          responseText: undefined,
+        };
+      await this.historyStore.save(persistedRecord);
       const editor = this.getEditorSnapshot();
       await recordExecution(this.context.globalState, {
         mode: 'single',
