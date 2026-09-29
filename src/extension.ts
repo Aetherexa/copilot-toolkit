@@ -803,11 +803,6 @@ interface ModeItem extends vscode.QuickPickItem {
 async function selectMode(): Promise<ModeItem | undefined> {
   const modes: ModeItem[] = [
     {
-      label: '$(layout) Open AI Workflow Studio',
-      description: 'Try the new UI while keeping the classic prompt and workflow experience available',
-      mode: 'studio',
-    },
-    {
       label: '$(zap) Run Single Prompt',
       description: 'Pick one prompt and run it against the active file',
       mode: 'single',
@@ -816,6 +811,11 @@ async function selectMode(): Promise<ModeItem | undefined> {
       label: '$(sync) Run Multi-Step Workflow',
       description: 'Select multiple prompts and run them together as sequential steps',
       mode: 'workflow',
+    },
+    {
+      label: '$(layout) New: Open AI Workflow Studio',
+      description: 'Try the new UI; classic prompt and workflow modes remain fully available',
+      mode: 'studio',
     },
   ];
 
