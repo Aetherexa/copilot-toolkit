@@ -40,6 +40,16 @@ test('workspace file filters exclude common credential and secret files', () => 
   assert.equal(shouldIndexFile('/repo/src/config.json', 100), true);
 });
 
+test('workspace indexer does not retain full source text after analysis', async () => {
+  const indexer = new WorkspaceIndexer([new JsTsLanguageAnalyzer()], new FallbackLanguageAnalyzer());
+  await indexer.initialize([
+    { info: file('src/a.ts'), languageId: 'typescript', content: 'export const secretFreeSource = 1;' },
+  ]);
+
+  assert.equal(indexer.getFiles()[0]?.content, '');
+  assert.equal(indexer.getEntities().some(entity => entity.name === 'secretFreeSource'), true);
+});
+
 test('workspace indexer builds entities and relations incrementally', async () => {
   const indexer = new WorkspaceIndexer([new JsTsLanguageAnalyzer()], new FallbackLanguageAnalyzer());
   await indexer.initialize([
