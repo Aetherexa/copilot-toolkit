@@ -160,7 +160,7 @@ function createExecutionStub(options: StubOptions = {}) {
   };
 }
 
-function createEngine(executionEngine: ExecutionEngine) {
+function createEngine(executionEngine: ExecutionEngine, storeHistoryContent = false) {
   const analyticsState = new MemoryMemento();
   const historyState = new MemoryMemento();
   const historyStore = new WorkflowHistoryStore(historyState);
@@ -169,6 +169,7 @@ function createEngine(executionEngine: ExecutionEngine) {
     executionEngine,
     historyStore,
     new TokenEstimator(),
+    () => storeHistoryContent,
   );
 
   return { workflowEngine, historyStore };
@@ -192,6 +193,37 @@ test('WorkflowEngine executes enabled steps sequentially and chains previous out
   assert.equal(stub.extraContexts[0].length, 0);
   assert.equal(stub.extraContexts[1][0]?.title, 'Previous Step Output');
   assert.equal(stub.extraContexts[1][0]?.content, 'First-output');
+});
+
+test('WorkflowEngine keeps chaining output in the current run without persisting content by default', async () => {
+  const stub = createExecutionStub();
+  const { workflowEngine, historyStore } = createEngine(stub.engine);
+  const workflow = createWorkflow([
+    { id: 'step-1', name: 'First', inlinePrompt: 'First body', enabled: true },
+    { id: 'step-2', name: 'Second', inlinePrompt: 'Second body', enabled: true, inputFromPreviousStep: true },
+  ]);
+
+  const result = await workflowEngine.runWorkflow(workflow, [], () => undefined);
+  const stored = historyStore.load()[0];
+
+  assert.equal(result.record.finalOutput, 'Second-output');
+  assert.equal(stub.extraContexts[1][0]?.content, 'First-output');
+  assert.equal(stored?.finalOutput, undefined);
+  assert.equal(stored?.steps[0]?.outputText, undefined);
+});
+
+test('WorkflowEngine persists output content only when explicitly enabled', async () => {
+  const stub = createExecutionStub();
+  const { workflowEngine, historyStore } = createEngine(stub.engine, true);
+  const workflow = createWorkflow([
+    { id: 'step-1', name: 'First', inlinePrompt: 'First body', enabled: true },
+  ]);
+
+  await workflowEngine.runWorkflow(workflow, [], () => undefined);
+  const stored = historyStore.load()[0];
+
+  assert.equal(stored?.finalOutput, 'First-output');
+  assert.equal(stored?.steps[0]?.outputText, 'First-output');
 });
 
 test('WorkflowEngine stops after a failed step by default', async () => {
