@@ -57,6 +57,35 @@ test('workspace indexer builds entities and relations incrementally', async () =
   assert.equal(indexer.getFiles().length, 2);
 });
 
+test('JS/TS analyzer emits valid local inheritance and call relations', async () => {
+  const indexer = new WorkspaceIndexer([new JsTsLanguageAnalyzer()], new FallbackLanguageAnalyzer());
+  await indexer.initialize([
+    {
+      info: file('src/models.ts'),
+      languageId: 'typescript',
+      content: [
+        'export class Base {}',
+        'export class Child extends Base {}',
+        'export function helper() { return 1; }',
+        'export function run() { return helper(); }',
+      ].join('\n'),
+    },
+  ]);
+
+  const entities = indexer.getEntities();
+  const relations = indexer.getRelations();
+  const base = entities.find(entity => entity.name === 'Base' && entity.type === 'class');
+  const child = entities.find(entity => entity.name === 'Child' && entity.type === 'class');
+  const helper = entities.find(entity => entity.name === 'helper' && entity.type === 'function');
+
+  assert.ok(base);
+  assert.ok(child);
+  assert.ok(helper);
+  assert.equal(relations.some(relation => relation.type === 'extends' && relation.source === child.id && relation.target === base.id), true);
+  assert.equal(relations.some(relation => relation.type === 'calls' && relation.target === helper.id), true);
+  assert.equal(relations.every(relation => relation.type !== 'extends' || entities.some(entity => entity.id === relation.target)), true);
+});
+
 test('graph query service returns dependencies and reverse dependencies', async () => {
   const indexer = new WorkspaceIndexer([new JsTsLanguageAnalyzer()], new FallbackLanguageAnalyzer());
   await indexer.initialize([
