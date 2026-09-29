@@ -168,6 +168,30 @@ test('ExecutionEngine can persist content when the user explicitly opts in', asy
   assert.equal(stored?.responseText, 'hello world');
 });
 
+test('ExecutionEngine redacts secret-like literals from the final provider request', async () => {
+  let receivedPrompt = '';
+  const provider = createProvider({
+    async execute(request) {
+      receivedPrompt = request.assembledPrompt;
+      return {
+        success: true,
+        providerId: 'github-copilot',
+        providerName: 'GitHub Copilot',
+        modelId: 'model-1',
+        responseText: 'ok',
+      };
+    },
+  });
+  const { engine } = createEngine(provider);
+  const prompt = createPrompt();
+  prompt.body = 'Review config: API_KEY=super-secret-value';
+
+  await engine.runPrompt(prompt, () => undefined);
+
+  assert.doesNotMatch(receivedPrompt, /super-secret-value/);
+  assert.match(receivedPrompt, /\[REDACTED\]/);
+});
+
 test('ExecutionEngine rejects requests that exceed the selected model input limit', async () => {
   const provider = createProvider({
     definition: {
