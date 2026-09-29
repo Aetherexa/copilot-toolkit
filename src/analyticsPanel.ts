@@ -64,7 +64,7 @@ function renderCombinedImpact(ci: CombinedImpact): string {
       </div>
     </div>
     <div class="impact-right">
-      <div class="oes-label">Overall Engineering Effectiveness</div>
+      <div class="oes-label">Estimated Engineering Effectiveness</div>
       <div class="oes-score" style="color:${oc}">${ci.overallEngEffectivenessScore}<span class="oes-max">/100</span></div>
       ${pctBar(ci.overallEngEffectivenessScore, oc)}
       <div class="oes-formula">Code Quality 35% · Cognitive Load 30% · Skill Effectiveness 25% · Gain 10%</div>
@@ -78,31 +78,32 @@ function renderCodeQuality(cq: CodeQualityMetrics): string {
   const fc = cq.fixRate >= 70 ? '#4ade80' : cq.fixRate >= 40 ? '#facc15' : '#f87171';
   return `
   <section class="card">
-    <h2>✅ Code Quality Metrics</h2>
+    <h2>✅ Estimated Code Quality Signals</h2>
+    <p class="sub-hint">These values are heuristic estimates derived from prompt usage. They are not measured defects, prevented incidents, or validated fixes.</p>
     <div class="stats-row">
-      ${renderStat('🐛', 'Issues Detected',          `${cq.totalIssuesDetected}`,    'across all sessions',        '#f87171')}
-      ${renderStat('🔧', 'Fixes Applied',             `${cq.totalFixesApplied}`,      'by fix-oriented prompts',    '#4ade80')}
-      ${renderStat('🎯', 'Fix Rate',                  `${cq.fixRate}%`,              'fixes ÷ issues',             fc)}
-      ${renderStat('🚨', 'Critical Issues Prevented', `${cq.criticalIssuesPrevented}`,'debug / security / pre-PR', '#f97316')}
+      ${renderStat('🐛', 'Estimated Findings',          `${cq.totalIssuesDetected}`,    'across all sessions',        '#f87171')}
+      ${renderStat('🔧', 'Fix-Oriented Runs',             `${cq.totalFixesApplied}`,      'by fix-oriented prompts',    '#4ade80')}
+      ${renderStat('🎯', 'Estimated Fix Ratio',                  `${cq.fixRate}%`,              'fixes ÷ issues',             fc)}
+      ${renderStat('🚨', 'High-Risk Review Signals', `${cq.criticalIssuesPrevented}`,'debug / security / pre-PR', '#f97316')}
     </div>
     <div class="metric-row">
       <div class="metric-item">
-        <span class="metric-name">Error Reduction</span>
+        <span class="metric-name">Estimated Quality Impact</span>
         <span class="metric-val">${cq.errorReductionPct}%</span>
         ${pctBar(cq.errorReductionPct, '#4ade80')}
-        <span class="metric-hint">vs working without Copilot Toolkit</span>
+        <span class="metric-hint">heuristic estimate; not measured defect reduction</span>
       </div>
       <div class="metric-item">
-        <span class="metric-name">Fix Rate</span>
+        <span class="metric-name">Estimated Fix Ratio</span>
         <span class="metric-val">${cq.fixRate}%</span>
         ${pctBar(cq.fixRate, fc)}
-        <span class="metric-hint">fixes applied ÷ issues detected</span>
+        <span class="metric-hint">fix-oriented runs ÷ estimated findings</span>
       </div>
       <div class="metric-item">
-        <span class="metric-name">Quality Score</span>
+        <span class="metric-name">Estimated Quality Score</span>
         <span class="metric-val">${cq.qualityScore} / 100</span>
         ${pctBar(cq.qualityScore, '#4ade80')}
-        <span class="metric-hint">composite: fix rate + reduction + critical + usage</span>
+        <span class="metric-hint">heuristic composite; use observed execution/fix tracking for factual outcomes</span>
       </div>
     </div>
     <p class="metric-footnote">Issues per execution: <strong>${cq.issuesPerExecution}</strong> — a declining value over time indicates an improving codebase.</p>
@@ -182,8 +183,8 @@ function renderDaySummary(s: DailySummary, title: string): string {
     <div class="stats-row">
       ${renderStat('⚡', 'Actions Performed', `${s.executions}`)}
       ${renderStat('⏱', 'Time Saved', fmtTime(s.timeSavedMinutes))}
-      ${renderStat('🐛', 'Issues Detected', `${s.issuesDetected}`)}
-      ${renderStat('🔧', 'Fixes Applied', `${s.fixesApplied}`)}
+      ${renderStat('🐛', 'Estimated Findings', `${s.issuesDetected}`)}
+      ${renderStat('🔧', 'Fix-Oriented Runs', `${s.fixesApplied}`)}
     </div>
     ${s.skillsUsed.length ? `<p class="tag-row">Skills used: ${s.skillsUsed.map(s => `<span class="tag">${s}</span>`).join('')}</p>` : ''}
     ${s.promptsUsed.length ? `<p class="tag-row">Prompts used: ${s.promptsUsed.map(p => `<span class="tag prompt-tag">${p.replace(/^[⚡📂]\s[\w-]+:\s/, '')}</span>`).join('')}</p>` : ''}
