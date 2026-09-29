@@ -76,24 +76,35 @@ export class ExecutionEngine {
   }
 
   async preparePrompt(prompt: PromptDefinition, extraContext: ResolvedContext[] = []): Promise<PreparedPromptExecution> {
-    const executionId = createId();
     await this.beforeContextResolve?.(prompt);
+    const requestedContextBudget = prompt.contextBudgetTokens ?? 1800;
+    const promptTokens = this.tokenEstimator.estimate(prompt.body);
+    const providerId = prompt.providerId ?? 'github-copilot';
+    const model = this.providerRegistry.getModel(providerId, prompt.modelId);
+    const effectiveContextBudget = model?.maxInputTokens
+      ? Math.min(requestedContextBudget, Math.max(0, model.maxInputTokens - promptTokens - 256))
+      : requestedContextBudget;
     const resolution = await this.contextEngine.resolve(
       prompt.context,
-      prompt.contextBudgetTokens ?? 1800,
+      effectiveContextBudget,
       extraContext,
     );
     const mergedContext = resolution.items;
     const contextTokens = resolution.includedTokens;
     const assembledPrompt = this.promptAssembler.assemble(prompt, mergedContext);
     const estimatedInputTokens = this.tokenEstimator.estimate(assembledPrompt);
+    if (model?.maxInputTokens && estimatedInputTokens > model.maxInputTokens) {
+      throw new Error(
+        `Assembled request exceeds the selected model input limit (${estimatedInputTokens}/${model.maxInputTokens} tokens estimated).`,
+      );
+    }
     return {
       preview: {
         prompt: assembledPrompt,
-        promptTokens: this.tokenEstimator.estimate(prompt.body),
+        promptTokens,
         contextTokens,
         totalTokens: estimatedInputTokens,
-        contextBudgetTokens: prompt.contextBudgetTokens ?? 1800,
+        contextBudgetTokens: effectiveContextBudget,
         totalCandidateContextTokens: resolution.totalCandidateTokens,
         utilizationPercent: resolution.utilizationPercent,
         excludedContextCount: mergedContext.filter(item => item.status === 'excluded').length,
