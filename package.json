@@ -120,6 +120,11 @@
 					"type": "boolean",
 					"default": true,
 					"description": "Enable adaptive skill recommendation learning. Tracks which skills you use most often to improve future suggestions."
+				},
+				"copilotToolkit.history.storeContent": {
+					"type": "boolean",
+					"default": false,
+					"description": "Store full prompt/context and AI response text in local workspace execution history. Disabled by default for privacy."
 				}
 			}
 		}
