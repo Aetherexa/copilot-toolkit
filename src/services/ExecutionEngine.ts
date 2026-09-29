@@ -8,6 +8,7 @@ import { ProviderRegistry } from '../providers/ProviderRegistry';
 import { TokenEstimator } from './TokenEstimator';
 import { ExecutionHistoryStore } from './ExecutionHistoryStore';
 import { recordExecution } from '../analytics';
+import { redactSecrets } from './SecretRedactor';
 
 export interface ExecutionRunResult {
   preview: PromptPreview;
@@ -92,7 +93,8 @@ export class ExecutionEngine {
     const mergedContext = resolution.items;
     const contextTokens = resolution.includedTokens;
     const assembledPrompt = this.promptAssembler.assemble(prompt, mergedContext);
-    const estimatedInputTokens = this.tokenEstimator.estimate(assembledPrompt);
+    const sanitizedPrompt = redactSecrets(assembledPrompt).text;
+    const estimatedInputTokens = this.tokenEstimator.estimate(sanitizedPrompt);
     if (model?.maxInputTokens && estimatedInputTokens > model.maxInputTokens) {
       throw new Error(
         `Assembled request exceeds the selected model input limit (${estimatedInputTokens}/${model.maxInputTokens} tokens estimated).`,
@@ -100,7 +102,7 @@ export class ExecutionEngine {
     }
     return {
       preview: {
-        prompt: assembledPrompt,
+        prompt: sanitizedPrompt,
         promptTokens,
         contextTokens,
         totalTokens: estimatedInputTokens,
@@ -112,7 +114,7 @@ export class ExecutionEngine {
       },
       request: {
         prompt,
-        assembledPrompt,
+        assembledPrompt: sanitizedPrompt,
         resolvedContext: mergedContext,
         estimatedInputTokens,
       },
