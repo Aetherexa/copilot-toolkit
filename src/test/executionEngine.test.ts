@@ -67,7 +67,7 @@ function createProvider(overrides: Partial<RegisteredProvider> = {}): Registered
   };
 }
 
-function createEngine(provider?: RegisteredProvider) {
+function createEngine(provider?: RegisteredProvider, storeHistoryContent = false) {
   const registry = new ProviderRegistry();
   if (provider) {
     registry.register(provider);
@@ -95,6 +95,8 @@ function createEngine(provider?: RegisteredProvider) {
     historyStore,
     () => cancellation as never,
     () => ({ languageId: 'typescript', fileName: 'example.ts' }),
+    undefined,
+    () => storeHistoryContent,
   );
 
   return { engine, registry, historyStore, cancellation };
@@ -143,6 +145,27 @@ test('ExecutionEngine streams progress, stores history, and returns execution me
   assert.equal(result.record.responseText, 'hello world');
   assert.equal(engine.getHistory().length, 1);
   assert.equal(result.record.status, 'success');
+});
+
+test('ExecutionEngine keeps full output for the current run but does not persist content by default', async () => {
+  const { engine } = createEngine(createProvider());
+
+  const result = await engine.runPrompt(createPrompt(), () => undefined);
+  const stored = engine.getHistory()[0];
+
+  assert.equal(result.record.responseText, 'hello world');
+  assert.equal(stored?.requestPreview, '[Content not retained]');
+  assert.equal(stored?.responseText, undefined);
+});
+
+test('ExecutionEngine can persist content when the user explicitly opts in', async () => {
+  const { engine } = createEngine(createProvider(), true);
+
+  await engine.runPrompt(createPrompt(), () => undefined);
+  const stored = engine.getHistory()[0];
+
+  assert.match(stored?.requestPreview ?? '', /Review this code/);
+  assert.equal(stored?.responseText, 'hello world');
 });
 
 test('ExecutionEngine rejects unavailable providers', async () => {
