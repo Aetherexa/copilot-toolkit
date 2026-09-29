@@ -54,7 +54,7 @@ export class WorkspaceIndexer {
       content: '',
     });
     this.analysis.set(file.info.absolutePath, result);
-    this.refreshStatus('ready');
+    this.refreshStatus(emit ? 'ready' : 'indexing', emit ? undefined : 'Indexing workspace…');
     if (emit) {
       this.emitter.emit('change');
     }
