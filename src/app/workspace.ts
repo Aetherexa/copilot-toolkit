@@ -14,6 +14,19 @@ const ROOT_MARKERS = [
   '.sln',
 ];
 
+function isContainedPath(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
+}
+
+function realPathIfPresent(value: string): string {
+  try {
+    return fs.realpathSync.native(value);
+  } catch {
+    return path.resolve(value);
+  }
+}
+
 export function getWorkspaceRoot(): string | undefined {
   const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (wsFolder) {
@@ -53,13 +66,42 @@ export function getWorkspaceRoot(): string | undefined {
   return path.dirname(activeFile.fsPath);
 }
 
+/**
+ * Resolves a configured workspace-relative path without allowing path traversal
+ * or symlink escapes outside the current workspace root.
+ */
+export function resolveWorkspacePath(root: string, configuredPath: string): string | undefined {
+  const value = configuredPath.trim();
+  if (!value) {
+    return undefined;
+  }
+
+  const resolvedRoot = path.resolve(root);
+  const candidate = path.resolve(resolvedRoot, value);
+  if (!isContainedPath(resolvedRoot, candidate)) {
+    return undefined;
+  }
+
+  const realRoot = realPathIfPresent(resolvedRoot);
+  const realCandidate = realPathIfPresent(candidate);
+  if (!isContainedPath(realRoot, realCandidate)) {
+    return undefined;
+  }
+
+  return candidate;
+}
+
 export function getConfigPath(key: 'promptFolder' | 'skillFile' | 'skillsFolder'): string | undefined {
+  if (!vscode.workspace.isTrusted) {
+    return undefined;
+  }
+
   const root = getWorkspaceRoot();
   if (!root) {
     return undefined;
   }
 
   const cfg = vscode.workspace.getConfiguration('copilotToolkit');
-  const relative: string = cfg.get(key) ?? '';
-  return path.join(root, relative);
+  const configured = cfg.get<string>(key, '');
+  return resolveWorkspacePath(root, configured);
 }
