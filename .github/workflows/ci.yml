@@ -6,6 +6,7 @@ on:
       - main
       - 'feature/**'
       - 'fix/**'
+      - 'release/**'
       - 'v2-*'
   pull_request:
     branches:
@@ -26,14 +27,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 22]
+        node: [22, 24]
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -53,10 +54,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -64,7 +65,7 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Test with coverage
+      - name: Test with coverage gates
         run: npm run test:coverage
 
   security:
@@ -73,18 +74,21 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install
         run: npm ci
 
-      - name: Audit critical vulnerabilities
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Block critical build-tool vulnerabilities
         run: npm audit --audit-level=critical
 
   package:
@@ -97,12 +101,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install
@@ -114,8 +118,18 @@ jobs:
       - name: Package
         run: npx @vscode/vsce package --no-dependencies --out copilot-toolkit.vsix
 
+      - name: Verify VSIX hygiene
+        run: |
+          unzip -Z1 copilot-toolkit.vsix > vsix-files.txt
+          grep -q '^extension/out/extension.js$' vsix-files.txt
+          grep -q '^extension/media/studio/main.js$' vsix-files.txt
+          if grep -E '^extension/(src/|out/test/|\.github/|docs/)|\.map$' vsix-files.txt; then
+            echo 'VSIX contains development-only files.'
+            exit 1
+          fi
+
       - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: copilot-toolkit-vsix
           path: copilot-toolkit.vsix

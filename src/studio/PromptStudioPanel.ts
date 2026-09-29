@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -43,16 +44,12 @@ import {
 import { ServiceContainer } from '../app/serviceContainer';
 
 function createNonce(): string {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let value = '';
-  for (let index = 0; index < 32; index += 1) {
-    value += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
-  }
-  return value;
+  return randomBytes(18).toString('base64url');
 }
 
 export class PromptStudioPanel {
   private static current: PromptStudioPanel | undefined;
+  private readonly panelDisposables: vscode.Disposable[] = [];
 
   static createOrReveal(services: ServiceContainer): PromptStudioPanel {
     if (PromptStudioPanel.current) {
@@ -84,19 +81,23 @@ export class PromptStudioPanel {
   ) {
     this.panel.onDidDispose(() => {
       PromptStudioPanel.current = undefined;
+      for (const disposable of this.panelDisposables.splice(0)) {
+        disposable.dispose();
+      }
     }, null, this.services.context.subscriptions);
 
-    this.services.workspaceIntelligence.onDidChangeStatus(status => {
-      const payload: IndexStatusMessage = {
-        type: 'index.status',
-        payload: { status },
-      };
-      this.postMessage(payload);
-    });
-
-    this.panel.webview.onDidReceiveMessage(message => {
-      void this.handleMessage(message as StudioWebviewMessage);
-    }, null, this.services.context.subscriptions);
+    this.panelDisposables.push(
+      this.services.workspaceIntelligence.onDidChangeStatus(status => {
+        const payload: IndexStatusMessage = {
+          type: 'index.status',
+          payload: { status },
+        };
+        this.postMessage(payload);
+      }),
+      this.panel.webview.onDidReceiveMessage(message => {
+        void this.handleMessage(message as StudioWebviewMessage);
+      }),
+    );
 
     this.panel.webview.html = this.render();
     void this.bootstrap();
@@ -575,7 +576,7 @@ export class PromptStudioPanel {
     this.postMessage({
       type: 'graph.viewResult',
       payload: {
-        view: this.services.workspaceIntelligence.getMapView(activeFilePath, message.payload.depth, message.payload.reverse),
+        view: await this.services.workspaceIntelligence.getMapView(activeFilePath, message.payload.depth, message.payload.reverse),
         status: this.services.workspaceIntelligence.getStatus(),
       },
     });

@@ -51,6 +51,7 @@ export class ExecutionEngine {
     private readonly historyStore: ExecutionHistoryStore,
     private readonly cancellationFactory: () => CancellationSourceLike,
     private readonly getEditorSnapshot: () => EditorSnapshot,
+    private readonly beforeContextResolve?: (prompt: PromptDefinition) => Promise<void>,
   ) {}
 
   getHistory(): PromptExecutionRecord[] {
@@ -75,6 +76,7 @@ export class ExecutionEngine {
 
   async preparePrompt(prompt: PromptDefinition, extraContext: ResolvedContext[] = []): Promise<PreparedPromptExecution> {
     const executionId = createId();
+    await this.beforeContextResolve?.(prompt);
     const resolution = await this.contextEngine.resolve(
       prompt.context,
       prompt.contextBudgetTokens ?? 1800,

@@ -175,3 +175,19 @@ test('current feature inference stays folder-scoped and exposes confidence', asy
   assert.match(result.content, /src\/orders\/service\.ts/);
   assert.doesNotMatch(result.content, /src\/users\/view\.ts/);
 });
+
+
+test('workspace indexer exposes an error state and notifies listeners', () => {
+  const indexer = new WorkspaceIndexer([new JsTsLanguageAnalyzer()], new FallbackLanguageAnalyzer());
+  let changes = 0;
+  const dispose = indexer.onDidChange(() => {
+    changes += 1;
+  });
+
+  indexer.markError('index failed');
+
+  assert.equal(indexer.getStatus().state, 'error');
+  assert.equal(indexer.getStatus().message, 'index failed');
+  assert.equal(changes, 1);
+  dispose();
+});

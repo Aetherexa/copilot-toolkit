@@ -7,12 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing version tag to release, for example v1.2.5
+        description: Existing version tag to release, for example v2.0.0
         required: true
         type: string
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
   group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
@@ -20,22 +21,25 @@ concurrency:
 
 jobs:
   release:
-    name: Build and publish GitHub release
+    name: Publish Marketplace and GitHub Release
     runs-on: ubuntu-latest
+    environment: marketplace-production
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      AZURE_CORE_OUTPUT: none
+      AZURE_TOKEN_CREDENTIALS: AzureCliCredential
 
     steps:
       - name: Checkout release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install
@@ -48,17 +52,43 @@ jobs:
       - name: Compile and typecheck
         run: npm run compile
 
-      - name: Unit tests
-        run: npm test
+      - name: Test with coverage gates
+        run: npm run test:coverage
+
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Package VSIX
         run: npx @vscode/vsce package --no-dependencies --out copilot-toolkit-${RELEASE_TAG}.vsix
 
+      - name: Verify VSIX hygiene
+        run: |
+          unzip -Z1 "copilot-toolkit-${RELEASE_TAG}.vsix" > vsix-files.txt
+          grep -q '^extension/out/extension.js$' vsix-files.txt
+          grep -q '^extension/media/studio/main.js$' vsix-files.txt
+          if grep -E '^extension/(src/|out/test/|\.github/|docs/)|\.map$' vsix-files.txt; then
+            echo 'VSIX contains development-only files.'
+            exit 1
+          fi
+
       - name: Create checksum
-        run: sha256sum copilot-toolkit-${RELEASE_TAG}.vsix > copilot-toolkit-${RELEASE_TAG}.vsix.sha256
+        run: sha256sum "copilot-toolkit-${RELEASE_TAG}.vsix" > "copilot-toolkit-${RELEASE_TAG}.vsix.sha256"
+
+      - name: Authenticate to Microsoft Entra with GitHub OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Verify Marketplace publisher access
+        run: npx @vscode/vsce verify-pat imsp-vibe-Coder-2596 --azure-credential
+
+      - name: Publish to VS Code Marketplace
+        run: npx @vscode/vsce publish --azure-credential --skip-duplicate --packagePath "copilot-toolkit-${RELEASE_TAG}.vsix"
 
       - name: Upload release build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: copilot-toolkit-${{ env.RELEASE_TAG }}
           path: |
@@ -67,8 +97,20 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$RELEASE_TAG"             "copilot-toolkit-$RELEASE_TAG.vsix"             "copilot-toolkit-$RELEASE_TAG.vsix.sha256"             --verify-tag             --generate-notes             --title "Copilot Toolkit $RELEASE_TAG"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              "copilot-toolkit-$RELEASE_TAG.vsix" \
+              "copilot-toolkit-$RELEASE_TAG.vsix.sha256" \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              "copilot-toolkit-$RELEASE_TAG.vsix" \
+              "copilot-toolkit-$RELEASE_TAG.vsix.sha256" \
+              --verify-tag \
+              --generate-notes \
+              --title "Copilot Toolkit $RELEASE_TAG"
+          fi
