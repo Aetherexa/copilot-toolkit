@@ -126,7 +126,15 @@ export class CopilotChatProvider implements RegisteredProvider {
         },
       };
     } catch (error) {
-      await vscode.env.clipboard.writeText(request.assembledPrompt);
+      const copyAction = 'Copy Request';
+      const choice = await vscode.window.showWarningMessage(
+        'Copilot Chat could not be opened. Copy the assembled request to the clipboard?',
+        copyAction,
+      );
+      const copied = choice === copyAction;
+      if (copied) {
+        await vscode.env.clipboard.writeText(request.assembledPrompt);
+      }
 
       return {
         success: false,
@@ -135,8 +143,10 @@ export class CopilotChatProvider implements RegisteredProvider {
         providerName: this.definition.displayName ?? this.definition.name,
         modelName: 'Copilot Chat',
         error: error instanceof Error
-          ? `${error.message}. The assembled prompt was copied to your clipboard.`
-          : 'Copilot Chat could not be opened. The assembled prompt was copied to your clipboard.',
+          ? `${error.message}.${copied ? ' The assembled request was copied to your clipboard.' : ''}`
+          : copied
+            ? 'Copilot Chat could not be opened. The assembled request was copied to your clipboard.'
+            : 'Copilot Chat could not be opened.',
       };
     }
   }
