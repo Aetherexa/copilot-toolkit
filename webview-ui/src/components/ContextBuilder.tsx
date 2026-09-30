@@ -9,6 +9,8 @@ interface ContextBuilderProps {
   onUpdateOptions: (type: ContextType, options: Partial<NonNullable<ContextBinding['options']>>) => void;
   onBudgetChange: (tokens: number) => void;
   onApplySuggestion: (type: ContextType) => void;
+  onPickFiles: () => void;
+  onRemoveSelectedFile: (filePath: string) => void;
   onPreview: () => void;
   previewBusy: boolean;
 }
@@ -19,6 +21,7 @@ const sections: Array<{ title: string; items: Array<{ type: ContextType; label: 
     items: [
       { type: 'currentFile', label: 'Current File' },
       { type: 'currentSelection', label: 'Selected Code' },
+      { type: 'selectedFiles', label: 'Selected Files' },
       { type: 'relatedFiles', label: 'Related Files' },
       { type: 'openEditors', label: 'Open Editors' },
       { type: 'currentFolder', label: 'Current Folder' },
@@ -62,12 +65,43 @@ function getBinding(context: ContextBinding[], type: ContextType): ContextBindin
 function renderOptions(
   binding: ContextBinding | undefined,
   onUpdateOptions: (type: ContextType, options: Partial<NonNullable<ContextBinding['options']>>) => void,
+  onPickFiles: () => void,
+  onRemoveSelectedFile: (filePath: string) => void,
 ) {
   if (!binding || !binding.enabled) {
     return null;
   }
 
   switch (binding.type) {
+    case 'selectedFiles': {
+      const filePaths = binding.options?.filePaths ?? [];
+      return (
+        <div className="selected-files-config">
+          <div className="selected-files-toolbar">
+            <span>{filePaths.length === 0 ? 'No files selected' : `${filePaths.length} pinned file${filePaths.length === 1 ? '' : 's'}`}</span>
+            <button type="button" className="button-secondary compact-button" onClick={onPickFiles}>
+              {filePaths.length === 0 ? 'Add Files' : 'Change Files'}
+            </button>
+          </div>
+          {filePaths.length > 0 && (
+            <div className="selected-files-list">
+              {filePaths.map(filePath => (
+                <div key={filePath} className="selected-file-row">
+                  <span title={filePath}>{filePath}</span>
+                  <button type="button" className="ghost-button" onClick={() => onRemoveSelectedFile(filePath)} aria-label={`Remove ${filePath}`}>
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <label className="field compact-field">
+            <span>Token Limit / File</span>
+            <input type="number" min={80} step={20} value={binding.options?.maxTokens ?? 500} onChange={event => onUpdateOptions(binding.type, { maxTokens: Number(event.target.value) || 80 })} />
+          </label>
+        </div>
+      );
+    }
     case 'relatedFiles':
     case 'relatedTests':
       return (
@@ -131,7 +165,7 @@ function renderOptions(
   }
 }
 
-export function ContextBuilder({ context, unsupportedContextTypes, contextBudgetTokens, suggestions, onToggle, onUpdateOptions, onBudgetChange, onApplySuggestion, onPreview, previewBusy }: ContextBuilderProps) {
+export function ContextBuilder({ context, unsupportedContextTypes, contextBudgetTokens, suggestions, onToggle, onUpdateOptions, onBudgetChange, onApplySuggestion, onPickFiles, onRemoveSelectedFile, onPreview, previewBusy }: ContextBuilderProps) {
   const enabled = new Map(context.map(binding => [binding.type, binding.enabled]));
 
   return (
@@ -175,12 +209,23 @@ export function ContextBuilder({ context, unsupportedContextTypes, contextBudget
               return (
                 <div key={`${section.title}-${item.label}`} className={`context-option${disabled ? ' is-disabled' : ''}`}>
                   <label className="context-option-main">
-                    <input type="checkbox" checked={enabled.get(item.type) ?? false} disabled={disabled} onChange={() => onToggle(item.type)} />
+                    <input
+                      type="checkbox"
+                      checked={enabled.get(item.type) ?? false}
+                      disabled={disabled}
+                      onChange={() => {
+                        if (item.type === 'selectedFiles' && !binding?.enabled && !(binding?.options?.filePaths?.length)) {
+                          onPickFiles();
+                          return;
+                        }
+                        onToggle(item.type);
+                      }}
+                    />
                     <span>{item.label}</span>
                     {suggested && !disabled && <em>Suggested</em>}
                     {disabled && <em>Coming soon</em>}
                   </label>
-                  {renderOptions(binding, onUpdateOptions)}
+                  {renderOptions(binding, onUpdateOptions, onPickFiles, onRemoveSelectedFile)}
                 </div>
               );
             })}
