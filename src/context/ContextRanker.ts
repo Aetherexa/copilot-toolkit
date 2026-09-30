@@ -2,6 +2,7 @@ import { ResolvedContext } from '../domain/context';
 
 const DEFAULT_SCORES: Partial<Record<ResolvedContext['type'], number>> = {
   currentSelection: 100,
+  selectedFiles: 98,
   currentFile: 95,
   gitDiff: 90,
   relatedFiles: 80,
