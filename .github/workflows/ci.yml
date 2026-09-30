@@ -94,10 +94,12 @@ jobs:
   sonar:
     name: SonarQube Cloud
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
       SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+      SONAR_REQUIRED: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
 
     steps:
       - name: Checkout full history
@@ -117,16 +119,29 @@ jobs:
       - name: Compile and typecheck
         run: npm run compile
 
-      - name: Check Sonar configuration
+      - name: Validate Sonar configuration
         id: sonar-config
         shell: bash
         run: |
-          if [[ -n "$SONAR_TOKEN" && -n "$SONAR_PROJECT_KEY" && -n "$SONAR_ORGANIZATION" ]]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
+          if [[ "$SONAR_REQUIRED" != "true" ]]; then
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::SonarQube Cloud scan skipped. Configure SONAR_TOKEN secret plus SONAR_PROJECT_KEY and SONAR_ORGANIZATION repository variables to enable it."
+            echo "::notice::SonarQube Cloud scan is intentionally skipped for branch push CI. PRs, main and manual runs perform the authoritative scan."
+            exit 0
           fi
+
+          missing=()
+          [[ -z "$SONAR_TOKEN" ]] && missing+=("SONAR_TOKEN secret")
+          [[ -z "$SONAR_PROJECT_KEY" ]] && missing+=("SONAR_PROJECT_KEY variable")
+          [[ -z "$SONAR_ORGANIZATION" ]] && missing+=("SONAR_ORGANIZATION variable")
+
+          if (( ${#missing[@]} > 0 )); then
+            printf -v missing_list '%s, ' "${missing[@]}"
+            echo "::error::SonarQube Cloud scan is required but configuration is missing: ${missing_list%, }."
+            exit 1
+          fi
+
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "::notice::Using CI-based SonarQube Cloud analysis. Automatic Analysis must be disabled for this project in SonarQube Cloud (Administration > Analysis Method)."
 
       - name: SonarQube Cloud scan
         if: steps.sonar-config.outputs.enabled == 'true'
