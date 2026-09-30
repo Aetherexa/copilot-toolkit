@@ -500,17 +500,22 @@ function mergeSkills(skills: SkillItem[]): string {
 
 // ─── Skill preview ────────────────────────────────────────────────────────────
 
-/** Opens a read-only virtual editor tab showing the combined skill content. */
+const SKILL_PREVIEW_MARKER = '# Copilot Toolkit — Skill Preview';
+
+/** Opens a virtual editor tab showing the combined skill content without stealing source-editor focus. */
 async function previewSkills(skills: SkillItem[]): Promise<void> {
   const combined = mergeSkills(skills);
-  const header = `# Copilot Toolkit — Skill Preview\n# Skills selected: ${skills.map(s => s.skillName).join(', ')}\n\n`;
+  const header = `${SKILL_PREVIEW_MARKER}\n# Skills selected: ${skills.map(s => s.skillName).join(', ')}\n\n`;
   const fullContent = header + combined;
 
   const doc = await vscode.workspace.openTextDocument({
     content: fullContent,
     language: 'markdown',
   });
-  await vscode.window.showTextDocument(doc, { preview: true, preserveFocus: false });
+
+  // Keep the user's source editor active. Otherwise a later Toolkit run can
+  // accidentally treat this generated Markdown preview as the code target.
+  await vscode.window.showTextDocument(doc, { preview: true, preserveFocus: true });
 }
 
 // ─── Skill picker UI ──────────────────────────────────────────────────────────
@@ -686,9 +691,21 @@ function getActiveCode(): ActiveCode | undefined {
   const editor = vscode.window.activeTextEditor;
   if (!editor) { return undefined; }
 
+  const documentText = editor.document.getText();
+  if (
+    editor.document.isUntitled
+    && editor.document.languageId === 'markdown'
+    && documentText.startsWith(SKILL_PREVIEW_MARKER)
+  ) {
+    vscode.window.showWarningMessage(
+      'Copilot Toolkit: The Skill Preview tab is not a code target. Focus the source file you want to analyze and run Toolkit again.',
+    );
+    return undefined;
+  }
+
   const selection = editor.selection;
   const code = selection.isEmpty
-    ? editor.document.getText()
+    ? documentText
     : editor.document.getText(selection);
 
   const fileName = editor.document.fileName.split(/[\\/]/).pop() ?? 'unknown';
