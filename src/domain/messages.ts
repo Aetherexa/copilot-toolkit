@@ -25,6 +25,13 @@ export interface ContextPreviewRequest {
   };
 }
 
+export interface ContextFilesPickRequest {
+  type: 'context.files.pick';
+  payload: {
+    selectedPaths: string[];
+  };
+}
+
 export interface PromptSaveRequest {
   type: 'prompt.save';
   payload: {
@@ -235,6 +242,7 @@ export interface StudioReadyRequest {
 export type StudioWebviewMessage =
   | StudioReadyRequest
   | ContextPreviewRequest
+  | ContextFilesPickRequest
   | PromptSaveRequest
   | PromptRunRequest
   | PromptCreateRequest
@@ -269,6 +277,13 @@ export type StudioWebviewMessage =
 export interface StudioBootstrapMessage {
   type: 'studio.bootstrap';
   payload: StudioBootstrapPayload;
+}
+
+export interface ContextFilesSelectedMessage {
+  type: 'context.files.selected';
+  payload: {
+    paths: string[];
+  };
 }
 
 export interface ContextPreviewResultMessage {
@@ -382,6 +397,7 @@ export interface NoticeMessage {
 
 export type StudioExtensionMessage =
   | StudioBootstrapMessage
+  | ContextFilesSelectedMessage
   | ContextPreviewResultMessage
   | PromptRunningMessage
   | PromptOutputMessage
