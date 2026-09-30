@@ -5,6 +5,7 @@ import { ContextRanker } from '../context/ContextRanker';
 import { ContextRegistry } from '../context/ContextRegistry';
 import { RelatedFilesEngine } from '../context/RelatedFilesEngine';
 import { GitDiffResolver } from '../context/resolvers/GitDiffResolver';
+import { SelectedFilesResolver } from '../context/resolvers/SelectedFilesResolver';
 import { ContextBinding, ContextResolver, ResolvedContext } from '../domain/context';
 import { TokenEstimator } from '../services/TokenEstimator';
 import { WorkspaceFileInfo } from '../services/WorkspaceIndexService';
@@ -136,6 +137,63 @@ test('RelatedFilesEngine detects related tests using common naming patterns', as
 
   const result = await engine.rankRelatedTests(source.absolutePath, 5);
   assert.equal(result[0]?.file.absolutePath, testFile.absolutePath);
+});
+
+test('SelectedFilesResolver resolves only explicitly selected files in requested order', async () => {
+  const first = createFile('/repo/src/first.ts', 'src/first.ts');
+  const second = createFile('/repo/src/second.ts', 'src/second.ts');
+  const ignored = createFile('/repo/src/ignored.ts', 'src/ignored.ts');
+  const workspaceIndex = {
+    getWorkspaceFiles: async () => [first, second, ignored],
+    readFileExcerpt: async (filePath: string) => ({
+      content: `content:${filePath}`,
+      truncated: false,
+      tokenEstimate: 10,
+      originalTokenEstimate: 10,
+      lineCount: 1,
+    }),
+  } as unknown as import('../services/WorkspaceIndexService').WorkspaceIndexService;
+
+  const resolver = new SelectedFilesResolver(workspaceIndex);
+  const result = await resolver.resolve({
+    type: 'selectedFiles',
+    enabled: true,
+    options: {
+      filePaths: ['src/second.ts', 'src/first.ts'],
+      maxTokens: 200,
+    },
+  });
+
+  assert.deepEqual(result.map(item => item.source?.label), ['src/second.ts', 'src/first.ts']);
+  assert.equal(result.every(item => item.reason === 'Manually selected by developer'), true);
+  assert.equal(result.some(item => item.source?.label === 'src/ignored.ts'), false);
+});
+
+test('ContextEngine prioritizes selected files ahead of automatic related files', async () => {
+  const registry = new ContextRegistry();
+  registry.register(new StubResolver('selectedFiles', {
+    type: 'selectedFiles',
+    title: 'Pinned',
+    content: 'p'.repeat(160),
+    tokenEstimate: 40,
+    truncated: false,
+  }));
+  registry.register(new StubResolver('relatedFiles', {
+    type: 'relatedFiles',
+    title: 'Related',
+    content: 'r'.repeat(400),
+    tokenEstimate: 100,
+    truncated: false,
+  }));
+  const engine = new ContextEngine(registry, new ContextRanker(), new TokenEstimator());
+
+  const result = await engine.resolve([
+    { type: 'relatedFiles', enabled: true },
+    { type: 'selectedFiles', enabled: true },
+  ], 50);
+
+  assert.equal(result.items[0].type, 'selectedFiles');
+  assert.equal(result.items[0].status, 'included');
 });
 
 test('Git-backed resolvers handle unavailable repositories gracefully', async () => {
