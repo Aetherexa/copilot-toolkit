@@ -45,11 +45,16 @@ export class WorkspaceIndexer {
   }
 
   async upsertFile(file: IndexedWorkspaceFile, emit = true): Promise<void> {
-    this.files.set(file.info.absolutePath, file);
     const analyzer = this.analyzers.find(candidate => candidate.supports(file.languageId, file.info)) ?? this.fallbackAnalyzer;
     const result = await analyzer.analyze(file.info, file.content);
+    this.files.set(file.info.absolutePath, {
+      ...file,
+      // Source text is only needed during analysis. Do not retain full workspace
+      // contents in the graph cache after entities/relations are extracted.
+      content: '',
+    });
     this.analysis.set(file.info.absolutePath, result);
-    this.refreshStatus('ready');
+    this.refreshStatus(emit ? 'ready' : 'indexing', emit ? undefined : 'Indexing workspace…');
     if (emit) {
       this.emitter.emit('change');
     }

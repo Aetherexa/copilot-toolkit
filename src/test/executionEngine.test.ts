@@ -67,7 +67,7 @@ function createProvider(overrides: Partial<RegisteredProvider> = {}): Registered
   };
 }
 
-function createEngine(provider?: RegisteredProvider) {
+function createEngine(provider?: RegisteredProvider, storeHistoryContent = false) {
   const registry = new ProviderRegistry();
   if (provider) {
     registry.register(provider);
@@ -95,6 +95,8 @@ function createEngine(provider?: RegisteredProvider) {
     historyStore,
     () => cancellation as never,
     () => ({ languageId: 'typescript', fileName: 'example.ts' }),
+    undefined,
+    () => storeHistoryContent,
   );
 
   return { engine, registry, historyStore, cancellation };
@@ -143,6 +145,69 @@ test('ExecutionEngine streams progress, stores history, and returns execution me
   assert.equal(result.record.responseText, 'hello world');
   assert.equal(engine.getHistory().length, 1);
   assert.equal(result.record.status, 'success');
+});
+
+test('ExecutionEngine keeps full output for the current run but does not persist content by default', async () => {
+  const { engine } = createEngine(createProvider());
+
+  const result = await engine.runPrompt(createPrompt(), () => undefined);
+  const stored = engine.getHistory()[0];
+
+  assert.equal(result.record.responseText, 'hello world');
+  assert.equal(stored?.requestPreview, '[Content not retained]');
+  assert.equal(stored?.responseText, undefined);
+});
+
+test('ExecutionEngine can persist content when the user explicitly opts in', async () => {
+  const { engine } = createEngine(createProvider(), true);
+
+  await engine.runPrompt(createPrompt(), () => undefined);
+  const stored = engine.getHistory()[0];
+
+  assert.match(stored?.requestPreview ?? '', /Review this code/);
+  assert.equal(stored?.responseText, 'hello world');
+});
+
+test('ExecutionEngine redacts secret-like literals from the final provider request', async () => {
+  let receivedPrompt = '';
+  const provider = createProvider({
+    async execute(request) {
+      receivedPrompt = request.assembledPrompt;
+      return {
+        success: true,
+        providerId: 'github-copilot',
+        providerName: 'GitHub Copilot',
+        modelId: 'model-1',
+        responseText: 'ok',
+      };
+    },
+  });
+  const { engine } = createEngine(provider);
+  const prompt = createPrompt();
+  prompt.body = 'Review config: API_KEY=super-secret-value';
+
+  await engine.runPrompt(prompt, () => undefined);
+
+  assert.doesNotMatch(receivedPrompt, /super-secret-value/);
+  assert.match(receivedPrompt, /\[REDACTED\]/);
+});
+
+test('ExecutionEngine rejects requests that exceed the selected model input limit', async () => {
+  const provider = createProvider({
+    definition: {
+      id: 'github-copilot',
+      name: 'GitHub Copilot',
+      enabled: true,
+      status: 'available',
+      models: [{ id: 'model-1', name: 'Tiny Model', enabled: true, maxInputTokens: 2 }],
+    },
+  });
+  const { engine } = createEngine(provider);
+
+  await assert.rejects(
+    () => engine.runPrompt(createPrompt(), () => undefined),
+    /exceeds the selected model input limit/,
+  );
 });
 
 test('ExecutionEngine rejects unavailable providers', async () => {

@@ -138,12 +138,14 @@ export function createServiceContainer(context: vscode.ExtensionContext): Servic
         await workspaceIntelligence.ensureInitialized();
       }
     },
+    () => vscode.workspace.getConfiguration('copilotToolkit').get<boolean>('history.storeContent', false),
   );
   const workflowEngine = new WorkflowEngine(
     context,
     executionEngine,
     workflowHistoryStore,
     tokenEstimator,
+    () => vscode.workspace.getConfiguration('copilotToolkit').get<boolean>('history.storeContent', false),
   );
 
   function toBootstrap(snapshot: PromptRepositorySnapshot, workflows: Workflow[], activePromptId?: string): StudioBootstrapPayload {

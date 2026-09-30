@@ -337,7 +337,18 @@ export default function App() {
       }
 
       if (incoming.type === 'execution.history') {
-        setExecutionHistory(incoming.payload.history);
+        setExecutionHistory(current => incoming.payload.history.map(item => {
+          const existing = current.find(candidate => candidate.id === item.id);
+          if (!existing) return item;
+          return {
+            ...item,
+            requestPreview: existing.requestPreview !== '[Content not retained]'
+              ? existing.requestPreview
+              : item.requestPreview,
+            responsePreview: existing.responsePreview ?? item.responsePreview,
+            responseText: existing.responseText ?? item.responseText,
+          };
+        }));
         setSelectedExecutionId(current =>
           current && incoming.payload.history.some(item => item.id === current)
             ? current
@@ -370,7 +381,25 @@ export default function App() {
       }
 
       if (incoming.type === 'workflow.history') {
-        setWorkflowHistory(incoming.payload.history);
+        setWorkflowHistory(current => incoming.payload.history.map(item => {
+          const existing = current.find(candidate => candidate.id === item.id);
+          if (!existing) return item;
+          const existingSteps = new Map(existing.steps.map(step => [step.stepId, step]));
+          return {
+            ...item,
+            finalOutput: existing.finalOutput ?? item.finalOutput,
+            steps: item.steps.map(step => {
+              const existingStep = existingSteps.get(step.stepId);
+              return existingStep
+                ? {
+                  ...step,
+                  outputPreview: existingStep.outputPreview ?? step.outputPreview,
+                  outputText: existingStep.outputText ?? step.outputText,
+                }
+                : step;
+            }),
+          };
+        }));
         setSelectedWorkflowExecutionId(current =>
           current && incoming.payload.history.some(item => item.id === current)
             ? current

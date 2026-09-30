@@ -4,6 +4,7 @@
  * Skill Score (0-10), Pattern Breakdown, and recent event log.
  * Uses data from metricsEngine + scoringEngine.
  */
+import { randomBytes } from 'crypto';
 import * as vscode from 'vscode';
 import { getSessionEvents, loadPersistedEvents, clearPersistedEvents } from '../services/logger';
 import { computeMetrics, fmtPct, fmtTime, ProductivityMetrics } from '../services/metricsEngine';
@@ -78,6 +79,7 @@ function _refreshPanel(context: vscode.ExtensionContext): void {
 // ─── HTML builder ─────────────────────────────────────────────────────────────
 
 function _buildHtml(m: ProductivityMetrics, s: SkillScoreResult): string {
+  const nonce = randomBytes(18).toString('base64url');
   const gradeColor: Record<string, string> = {
     S: '#a6e3a1', A: '#89dceb', B: '#cba6f7', C: '#f9e2af', D: '#f38ba8',
   };
@@ -200,9 +202,10 @@ function _buildHtml(m: ProductivityMetrics, s: SkillScoreResult): string {
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Productivity Insights</title>
-<style>
+<style nonce="${nonce}">
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
     --bg:       #1e1e2e;
@@ -344,12 +347,14 @@ function _buildHtml(m: ProductivityMetrics, s: SkillScoreResult): string {
   <h1>🧠 Productivity Insights</h1>
   <p class="subtitle">Real-time fix tracking, scoring, and skill effectiveness — Copilot Toolkit</p>
   <div class="toolbar">
-    <button onclick="vscode.postMessage({command:'refresh'})">🔄 Refresh</button>
-    <button class="danger" onclick="vscode.postMessage({command:'resetInsights'})">🗑 Reset Data</button>
+    <button id="refresh">🔄 Refresh</button>
+    <button id="resetInsights" class="danger">🗑 Reset Data</button>
   </div>
   ${hasData ? mainContent : zeroState}
-  <script>
+  <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
+    document.getElementById('refresh')?.addEventListener('click', () => vscode.postMessage({ command: 'refresh' }));
+    document.getElementById('resetInsights')?.addEventListener('click', () => vscode.postMessage({ command: 'resetInsights' }));
   </script>
 </body>
 </html>`;

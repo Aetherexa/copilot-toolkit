@@ -10,6 +10,9 @@ import { logEvent, flushToState } from './services/logger';
 import { applyFixCommand } from './commands/applyFix';
 import { createServiceContainer } from './app/serviceContainer';
 import { registerStudioCommands } from './app/registerCommands';
+import { getConfigPath, getWorkspaceRoot } from './app/workspace';
+import { redactSecrets } from './services/SecretRedactor';
+import { isSensitiveFilePath } from './services/workspaceFileFilters';
 
 // ─── Prompt item type ─────────────────────────────────────────────────────────
 
@@ -53,64 +56,6 @@ function getBuiltInPrompts(): PromptItem[] {
       body: 'Review this code based on the provided engineering instructions before it is merged via Pull Request. For each issue found, state: severity (critical / warning / suggestion), location, and a recommended fix.',
     },
   ];
-}
-
-// ─── Config helpers ───────────────────────────────────────────────────────────
-
-/**
- * Resolves the project root using multiple strategies so skills/prompts work
- * in all VS Code modes: workspace file, loose folder, single file open.
- *
- * Priority order:
- *  1. First workspace folder  (standard workspace / multi-root)
- *  2. Walk up from the active editor file looking for a project root marker
- *     (.git, package.json, tsconfig.json, pom.xml, pyproject.toml, .csproj)
- *  3. Directory of the active editor file (last resort)
- */
-function getWorkspaceRoot(): string | undefined {
-  // Strategy 1 — VS Code workspace folder (most reliable)
-  const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (wsFolder) { return wsFolder; }
-
-  // Strategy 2 & 3 — derive from active editor
-  const activeFile = vscode.window.activeTextEditor?.document?.uri;
-  if (!activeFile || activeFile.scheme !== 'file') { return undefined; }
-
-  const ROOT_MARKERS = [
-    '.git', 'package.json', 'tsconfig.json', 'pom.xml',
-    'pyproject.toml', 'requirements.txt', 'Cargo.toml', 'go.mod', '.sln',
-  ];
-
-  let dir = path.dirname(activeFile.fsPath);
-  // Walk up a maximum of 10 levels to find a project root marker
-  for (let i = 0; i < 10; i++) {
-    const hasMarker = ROOT_MARKERS.some(m => {
-      try {
-        // .csproj — check for any file matching the extension
-        if (m === '.sln') {
-          return fs.readdirSync(dir).some(f => f.endsWith('.sln') || f.endsWith('.csproj'));
-        }
-        return fs.existsSync(path.join(dir, m));
-      } catch { return false; }
-    });
-
-    if (hasMarker) { return dir; }
-
-    const parent = path.dirname(dir);
-    if (parent === dir) { break; } // reached filesystem root
-    dir = parent;
-  }
-
-  // Strategy 3 — just use the file's own directory
-  return path.dirname(activeFile.fsPath);
-}
-
-function getConfigPath(key: 'promptFolder' | 'skillFile' | 'skillsFolder'): string | undefined {
-  const root = getWorkspaceRoot();
-  if (!root) { return undefined; }
-  const cfg = vscode.workspace.getConfiguration('copilotToolkit');
-  const relative: string = cfg.get(key) ?? '';
-  return path.join(root, relative);
 }
 
 // ─── Skill loader / picker / merger ──────────────────────────────────────────
@@ -733,6 +678,7 @@ function loadAllPrompts(): PromptItem[] {
 interface ActiveCode {
   code: string;
   fileName: string;
+  filePath: string;
   languageId: string;
 }
 
@@ -746,8 +692,9 @@ function getActiveCode(): ActiveCode | undefined {
     : editor.document.getText(selection);
 
   const fileName = editor.document.fileName.split(/[\\/]/).pop() ?? 'unknown';
+  const filePath = editor.document.fileName;
   const languageId = editor.document.languageId;
-  return { code, fileName, languageId };
+  return { code, fileName, filePath, languageId };
 }
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
@@ -786,14 +733,24 @@ function buildWorkflowPrompt(skill: string, selectedPrompts: PromptItem[], code:
 
 // ─── Send to Copilot ──────────────────────────────────────────────────────────
 
-async function sendToCopilot(prompt: string): Promise<void> {
+async function sendToCopilot(prompt: string): Promise<boolean> {
+  const sanitizedPrompt = redactSecrets(prompt).text;
   try {
-    await vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
+    await vscode.commands.executeCommand('workbench.action.chat.open', { query: sanitizedPrompt });
+    return true;
   } catch {
-    await vscode.env.clipboard.writeText(prompt);
-    vscode.window.showInformationMessage(
-      'Copilot Toolkit: Could not open Copilot Chat automatically. The prompt has been copied to your clipboard.',
+    const copyAction = 'Copy Prompt';
+    const choice = await vscode.window.showWarningMessage(
+      'Copilot Toolkit could not open Copilot Chat automatically. Copy the assembled prompt to the clipboard?',
+      copyAction,
     );
+    if (choice !== copyAction) {
+      return false;
+    }
+
+    await vscode.env.clipboard.writeText(sanitizedPrompt);
+    vscode.window.showInformationMessage('Copilot Toolkit: The assembled prompt was copied to your clipboard.');
+    return true;
   }
 }
 
@@ -841,7 +798,9 @@ async function runWorkflowMode(
 
   // Step 3 — build and send
   const finalPrompt = buildWorkflowPrompt(skill, selected, active.code, active.fileName, active.languageId);
-  await sendToCopilot(finalPrompt);
+  if (!await sendToCopilot(finalPrompt)) {
+    return undefined;
+  }
 
   // Extract skill names from merged skill string for analytics
   const skillNames = extractSkillNames(skill);
@@ -854,7 +813,7 @@ async function runWorkflowMode(
 // ─── Mode selector ────────────────────────────────────────────────────────────
 
 interface ModeItem extends vscode.QuickPickItem {
-  mode: 'single' | 'workflow';
+  mode: 'single' | 'workflow' | 'studio';
 }
 
 async function selectMode(): Promise<ModeItem | undefined> {
@@ -868,6 +827,11 @@ async function selectMode(): Promise<ModeItem | undefined> {
       label: '$(sync) Run Multi-Step Workflow',
       description: 'Select multiple prompts and run them together as sequential steps',
       mode: 'workflow',
+    },
+    {
+      label: '$(layout) New: Open AI Workflow Studio',
+      description: 'Try the new UI; classic prompt and workflow modes remain fully available',
+      mode: 'studio',
     },
   ];
 
@@ -975,7 +939,16 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const disposable = vscode.commands.registerCommand('copilot-toolkit.open', async () => {
 
-    // 1. Get active code
+    // Keep the classic launcher as the stable entry point while Studio rolls out.
+    const mode = await selectMode();
+    if (!mode) { return; }
+
+    if (mode.mode === 'studio') {
+      await vscode.commands.executeCommand('copilot-toolkit.openStudio');
+      return;
+    }
+
+    // Classic single/workflow modes keep their existing active-editor behavior.
     const active = getActiveCode();
     if (!active) {
       vscode.window.showWarningMessage('Copilot Toolkit: No active editor found. Please open a file first.');
@@ -985,12 +958,11 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.window.showWarningMessage('Copilot Toolkit: The file or selection is empty.');
       return;
     }
+    if (isSensitiveFilePath(active.filePath)) {
+      vscode.window.showWarningMessage('Copilot Toolkit: Sensitive credential files are excluded from AI requests.');
+      return;
+    }
 
-    // 2. Select mode
-    const mode = await selectMode();
-    if (!mode) { return; }
-
-    // 3. Branch on mode
     if (mode.mode === 'workflow') {
       const result = await runWorkflowMode(active, state);
       if (result) {
@@ -1022,7 +994,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (!picked) { return; }
 
     const finalPrompt = buildFinalPrompt(skill, picked.body, active.code, active.fileName, active.languageId);
-    await sendToCopilot(finalPrompt);
+    if (!await sendToCopilot(finalPrompt)) { return; }
 
     // Record analytics
     await recordExecution(state, {

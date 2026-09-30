@@ -59,6 +59,7 @@ export class WorkflowEngine {
     private readonly executionEngine: ExecutionEngine,
     private readonly historyStore: WorkflowHistoryStore,
     private readonly tokenEstimator: TokenEstimator,
+    private readonly shouldStoreHistoryContent: () => boolean = () => false,
   ) {}
 
   getHistory(): WorkflowExecutionRecord[] {
@@ -178,7 +179,18 @@ export class WorkflowEngine {
         error: fatalError,
       };
 
-      await this.historyStore.save(record);
+      const persistedRecord = this.shouldStoreHistoryContent()
+        ? record
+        : {
+          ...record,
+          steps: record.steps.map(step => ({
+            ...step,
+            outputPreview: undefined,
+            outputText: undefined,
+          })),
+          finalOutput: undefined,
+        };
+      await this.historyStore.save(persistedRecord);
       await recordExecution(this.context.globalState, {
         mode: 'workflow',
         skillNames: ['workflow'],

@@ -1,5 +1,7 @@
 import { ContextBinding, ContextResolutionSummary, ResolvedContext } from '../domain/context';
 import { TokenEstimator } from '../services/TokenEstimator';
+import { redactSecrets } from '../services/SecretRedactor';
+import { isSensitiveFilePath } from '../services/workspaceFileFilters';
 import { ContextRanker } from './ContextRanker';
 import { ContextRegistry } from './ContextRegistry';
 
@@ -33,7 +35,8 @@ export class ContextEngine {
       }
     }
 
-    const ranked = this.ranker.rank(this.removeSelectionDuplication(resolved).map(item => ({
+    const sanitized = this.sanitizeContext(resolved);
+    const ranked = this.ranker.rank(this.removeSelectionDuplication(sanitized).map(item => ({
       ...item,
       status: item.status ?? 'included',
       originalTokenEstimate: item.originalTokenEstimate ?? item.tokenEstimate,
@@ -58,15 +61,52 @@ export class ContextEngine {
     };
   }
 
+  private sanitizeContext(items: ResolvedContext[]): ResolvedContext[] {
+    return items.map(item => {
+      if (item.source?.path && isSensitiveFilePath(item.source.path)) {
+        return {
+          ...item,
+          content: '',
+          tokenEstimate: 0,
+          status: 'excluded',
+          excludedReason: 'Sensitive file excluded from AI context',
+          reason: item.reason ? `${item.reason}; sensitive file excluded` : 'Sensitive file excluded',
+        };
+      }
+
+      const redacted = redactSecrets(item.content);
+      if (redacted.redactionCount === 0) {
+        return item;
+      }
+
+      return {
+        ...item,
+        content: redacted.text,
+        tokenEstimate: this.tokenEstimator.estimate(redacted.text),
+        reason: item.reason ? `${item.reason}; secrets redacted` : 'Secrets redacted before provider execution',
+        metadata: {
+          ...item.metadata,
+          secretsRedacted: redacted.redactionCount,
+        },
+      };
+    });
+  }
+
   private excludeDuplicates(items: ResolvedContext[]): ResolvedContext[] {
     const seenPaths = new Set<string>();
     const seenContent = new Set<string>();
 
     return items.map(item => {
-      const pathKey = item.source?.path?.toLowerCase();
+      const normalizedPath = item.source?.path?.replace(/\\/g, '/').toLowerCase();
+      const selection = item.source?.selection;
+      const pathKey = normalizedPath
+        ? item.type === 'currentSelection'
+          ? `selection:${normalizedPath}:${selection?.startLine ?? 0}:${selection?.endLine ?? 0}`
+          : `file:${normalizedPath}`
+        : undefined;
       const contentKey = item.content.trim().slice(0, 512);
-      const duplicateByPath = Boolean(pathKey && seenPaths.has(`${item.type}:${pathKey}`));
-      const duplicateByContent = Boolean(contentKey && seenContent.has(`${item.type}:${contentKey}`));
+      const duplicateByPath = Boolean(pathKey && seenPaths.has(pathKey));
+      const duplicateByContent = Boolean(contentKey && seenContent.has(contentKey));
 
       if (duplicateByPath || duplicateByContent) {
         return {
@@ -77,10 +117,10 @@ export class ContextEngine {
       }
 
       if (pathKey) {
-        seenPaths.add(`${item.type}:${pathKey}`);
+        seenPaths.add(pathKey);
       }
       if (contentKey) {
-        seenContent.add(`${item.type}:${contentKey}`);
+        seenContent.add(contentKey);
       }
 
       return item;

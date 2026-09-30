@@ -52,6 +52,8 @@ const LANGUAGE_BY_EXTENSION: Record<string, string> = {
 };
 
 const EXCLUDED_GLOB = '**/{.git,node_modules,dist,build,out,coverage,.next,target,bin,obj,media}/**';
+const MAX_INDEXED_FILES = 5_000;
+const MAX_INDEXED_BYTES = 64 * 1024 * 1024;
 function tokenizeName(value: string): string[] {
   return value
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -140,8 +142,23 @@ export class WorkspaceIndexService {
     }
 
     files.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
-    this.filesCache = files;
-    return files;
+
+    const bounded: WorkspaceFileInfo[] = [];
+    let totalBytes = 0;
+    for (const file of files) {
+      if (bounded.length >= MAX_INDEXED_FILES) {
+        break;
+      }
+      if (totalBytes + file.size > MAX_INDEXED_BYTES) {
+        continue;
+      }
+
+      bounded.push(file);
+      totalBytes += file.size;
+    }
+
+    this.filesCache = bounded;
+    return bounded;
   }
 
   async getFileInfo(filePath: string): Promise<WorkspaceFileInfo | undefined> {

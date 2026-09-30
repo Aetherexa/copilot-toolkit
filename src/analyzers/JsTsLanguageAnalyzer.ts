@@ -99,11 +99,40 @@ export class JsTsLanguageAnalyzer implements LanguageAnalyzer {
       });
     }
 
-    const declaredNames = entities.filter(entity => entity.file === file.relativePath && entity.type !== 'file').map(entity => entity.name);
-    for (const symbol of declaredNames) {
-      const callRegex = new RegExp(`\\b${symbol}\\s*\\(`, 'g');
+    const localEntities = entities.filter(entity => entity.file === file.relativePath && entity.type !== 'file');
+    const localEntityByName = new Map(localEntities.map(entity => [entity.name, entity]));
+
+    for (const relation of relations.filter(item => item.type === 'extends' || item.type === 'implements')) {
+      const marker = ':symbol:';
+      const markerIndex = relation.target.lastIndexOf(marker);
+      if (markerIndex < 0) {
+        continue;
+      }
+
+      const symbolName = relation.target.slice(markerIndex + marker.length);
+      const localTarget = localEntityByName.get(symbolName);
+      if (localTarget) {
+        relation.target = localTarget.id;
+        continue;
+      }
+
+      if (!entities.some(entity => entity.id === relation.target)) {
+        entities.push({
+          id: relation.target,
+          type: 'symbol',
+          name: symbolName,
+          file: file.relativePath,
+          language,
+          metadata: { unresolved: true },
+        });
+      }
+    }
+
+    for (const entity of localEntities.filter(item => item.type === 'function')) {
+      const callRegex = new RegExp(`\\b${entity.name}\\s*\\(`, 'g');
       if ([...content.matchAll(callRegex)].length > 1) {
-        relations.push({ source: rootId, target: symbolEntityId(file, 'function', symbol), type: 'references' });
+        relations.push({ source: rootId, target: entity.id, type: 'calls' });
+        relations.push({ source: rootId, target: entity.id, type: 'references' });
       }
     }
 

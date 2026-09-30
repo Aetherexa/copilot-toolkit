@@ -8,6 +8,7 @@ import { ProviderRegistry } from '../providers/ProviderRegistry';
 import { TokenEstimator } from './TokenEstimator';
 import { ExecutionHistoryStore } from './ExecutionHistoryStore';
 import { recordExecution } from '../analytics';
+import { redactSecrets } from './SecretRedactor';
 
 export interface ExecutionRunResult {
   preview: PromptPreview;
@@ -52,6 +53,7 @@ export class ExecutionEngine {
     private readonly cancellationFactory: () => CancellationSourceLike,
     private readonly getEditorSnapshot: () => EditorSnapshot,
     private readonly beforeContextResolve?: (prompt: PromptDefinition) => Promise<void>,
+    private readonly shouldStoreHistoryContent: () => boolean = () => false,
   ) {}
 
   getHistory(): PromptExecutionRecord[] {
@@ -75,24 +77,36 @@ export class ExecutionEngine {
   }
 
   async preparePrompt(prompt: PromptDefinition, extraContext: ResolvedContext[] = []): Promise<PreparedPromptExecution> {
-    const executionId = createId();
     await this.beforeContextResolve?.(prompt);
+    const requestedContextBudget = prompt.contextBudgetTokens ?? 1800;
+    const promptTokens = this.tokenEstimator.estimate(prompt.body);
+    const providerId = prompt.providerId ?? 'github-copilot';
+    const model = this.providerRegistry.getModel(providerId, prompt.modelId);
+    const effectiveContextBudget = model?.maxInputTokens
+      ? Math.min(requestedContextBudget, Math.max(0, model.maxInputTokens - promptTokens - 256))
+      : requestedContextBudget;
     const resolution = await this.contextEngine.resolve(
       prompt.context,
-      prompt.contextBudgetTokens ?? 1800,
+      effectiveContextBudget,
       extraContext,
     );
     const mergedContext = resolution.items;
     const contextTokens = resolution.includedTokens;
     const assembledPrompt = this.promptAssembler.assemble(prompt, mergedContext);
-    const estimatedInputTokens = this.tokenEstimator.estimate(assembledPrompt);
+    const sanitizedPrompt = redactSecrets(assembledPrompt).text;
+    const estimatedInputTokens = this.tokenEstimator.estimate(sanitizedPrompt);
+    if (model?.maxInputTokens && estimatedInputTokens > model.maxInputTokens) {
+      throw new Error(
+        `Assembled request exceeds the selected model input limit (${estimatedInputTokens}/${model.maxInputTokens} tokens estimated).`,
+      );
+    }
     return {
       preview: {
-        prompt: assembledPrompt,
-        promptTokens: this.tokenEstimator.estimate(prompt.body),
+        prompt: sanitizedPrompt,
+        promptTokens,
         contextTokens,
         totalTokens: estimatedInputTokens,
-        contextBudgetTokens: prompt.contextBudgetTokens ?? 1800,
+        contextBudgetTokens: effectiveContextBudget,
         totalCandidateContextTokens: resolution.totalCandidateTokens,
         utilizationPercent: resolution.utilizationPercent,
         excludedContextCount: mergedContext.filter(item => item.status === 'excluded').length,
@@ -100,7 +114,7 @@ export class ExecutionEngine {
       },
       request: {
         prompt,
-        assembledPrompt,
+        assembledPrompt: sanitizedPrompt,
         resolvedContext: mergedContext,
         estimatedInputTokens,
       },
@@ -162,7 +176,15 @@ export class ExecutionEngine {
         error: result.error,
       };
 
-      await this.historyStore.save(record);
+      const persistedRecord = this.shouldStoreHistoryContent()
+        ? record
+        : {
+          ...record,
+          requestPreview: '[Content not retained]',
+          responsePreview: undefined,
+          responseText: undefined,
+        };
+      await this.historyStore.save(persistedRecord);
       const editor = this.getEditorSnapshot();
       await recordExecution(this.context.globalState, {
         mode: 'single',
