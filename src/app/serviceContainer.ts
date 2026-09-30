@@ -16,6 +16,7 @@ import { OpenEditorsResolver } from '../context/resolvers/OpenEditorsResolver';
 import { RecentCommitsResolver } from '../context/resolvers/RecentCommitsResolver';
 import { RelatedFilesResolver } from '../context/resolvers/RelatedFilesResolver';
 import { RelatedTestsResolver } from '../context/resolvers/RelatedTestsResolver';
+import { SelectedFilesResolver } from '../context/resolvers/SelectedFilesResolver';
 import { WorkspaceSummaryResolver } from '../context/resolvers/WorkspaceSummaryResolver';
 import { ContextBinding, ContextType } from '../domain/context';
 import { PromptExecutionRequest, PromptExecutionResult } from '../domain/execution';
@@ -100,6 +101,7 @@ export function createServiceContainer(context: vscode.ExtensionContext): Servic
   const contextRegistry = new ContextRegistry();
   contextRegistry.register(new CurrentFileResolver(tokenEstimator));
   contextRegistry.register(new CurrentSelectionResolver(tokenEstimator));
+  contextRegistry.register(new SelectedFilesResolver(workspaceIndex));
   contextRegistry.register(new OpenEditorsResolver(workspaceIndex));
   contextRegistry.register(new CurrentFolderResolver(workspaceIndex));
   contextRegistry.register(new RelatedFilesResolver(relatedFilesEngine, workspaceIndex));
