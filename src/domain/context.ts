@@ -1,6 +1,7 @@
 export type ContextType =
   | 'currentFile'
   | 'currentSelection'
+  | 'selectedFiles'
   | 'relatedFiles'
   | 'openEditors'
   | 'currentFolder'
@@ -27,6 +28,7 @@ export interface ContextOptions {
   includeStaged?: boolean;
   includeUnstaged?: boolean;
   totalBudgetTokens?: number;
+  filePaths?: string[];
 }
 
 export interface ContextBinding {
