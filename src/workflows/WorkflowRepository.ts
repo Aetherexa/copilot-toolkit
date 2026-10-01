@@ -59,10 +59,15 @@ export class WorkflowRepository {
   constructor(private readonly state: vscode.Memento) {}
 
   async loadSnapshot(): Promise<WorkflowRepositorySnapshot> {
-    const stored = this.state.get<Workflow[]>(WORKFLOWS_KEY, []).map(normalizeWorkflow);
+    const builtIns = getBuiltInWorkflows();
+    const builtInIds = new Set(builtIns.map(workflow => workflow.id));
+    const stored = this.state.get<Workflow[]>(WORKFLOWS_KEY, []).map(workflow => normalizeWorkflow({
+      ...workflow,
+      source: builtInIds.has(workflow.id) ? 'builtin' : (workflow.source ?? 'workspace'),
+    }));
     const merged = new Map<string, Workflow>();
 
-    for (const workflow of getBuiltInWorkflows()) {
+    for (const workflow of builtIns) {
       merged.set(workflow.id, workflow);
     }
     for (const workflow of stored) {
