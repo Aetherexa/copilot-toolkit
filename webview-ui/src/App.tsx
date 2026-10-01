@@ -188,6 +188,7 @@ function mergeBootstrapState(
 
 export default function App() {
   const [prompts, setPrompts] = useState<PromptDefinition[]>([]);
+  const [skills, setSkills] = useState<StudioBootstrapPayload['skills']>([]);
   const [collections, setCollections] = useState<PromptCollection[]>([]);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [workflowHistory, setWorkflowHistory] = useState<WorkflowExecutionRecord[]>([]);
@@ -257,6 +258,7 @@ export default function App() {
     return onMessage((incoming: StudioExtensionMessage) => {
       if (incoming.type === 'studio.bootstrap') {
         setPrompts(incoming.payload.prompts);
+        setSkills(incoming.payload.skills);
         setCollections(incoming.payload.collections);
         setWorkflows(incoming.payload.workflows);
         setWorkflowHistory(incoming.payload.workflowHistory);
@@ -560,6 +562,7 @@ export default function App() {
     ?? null;
 
   function openPromptInTab(prompt: PromptDefinition): void {
+    setActiveNav('Prompt Editor');
     const existing = tabs.find(tab => tab.prompt.id === prompt.id || tab.savedPrompt?.id === prompt.id);
     if (existing) {
       setActiveTabId(existing.id);
@@ -578,7 +581,6 @@ export default function App() {
 
   function openPromptFromCatalog(prompt: PromptDefinition): void {
     openPromptInTab(prompt);
-    setActiveNav('All Prompts');
   }
 
   function updateActivePrompt(nextPrompt: PromptDefinition): void {
@@ -600,6 +602,7 @@ export default function App() {
   }
 
   function focusTab(tabId: string): void {
+    setActiveNav('Prompt Editor');
     setActiveTabId(tabId);
     setPreview(null);
     setError('');
@@ -650,6 +653,7 @@ export default function App() {
   }
 
   function handleCreatePrompt(): void {
+    setActiveNav('Prompt Editor');
     pendingActionRef.current = { kind: 'openActivePrompt' };
     postMessage({ type: 'prompt.create', payload: { name: 'Untitled Prompt' } });
   }
@@ -714,6 +718,7 @@ export default function App() {
   }
 
   function handleImport(): void {
+    setActiveNav('Prompt Editor');
     pendingActionRef.current = { kind: 'openActivePrompt' };
     postMessage({ type: 'import.open' });
   }
@@ -1128,9 +1133,9 @@ export default function App() {
     setSelectedWorkflowExecutionId(null);
   }
 
-  const builtInGroups = useMemo(() => {
+  const promptCatalogGroups = useMemo(() => {
     const groups = new Map<string, PromptDefinition[]>();
-    for (const prompt of visiblePrompts.filter(item => item.source === 'builtin')) {
+    for (const prompt of visiblePrompts) {
       const category = prompt.category.trim() || 'Other';
       const items = groups.get(category) ?? [];
       items.push(prompt);
@@ -1150,8 +1155,16 @@ export default function App() {
     );
   }, [workflows, searchQuery]);
 
-  const promptEditorNav = ['All Prompts', 'Favorites', 'My Prompts', 'Collections'].includes(activeNav);
+  const promptCatalogNav = ['All Prompts', 'My Prompts', 'Built-in Actions'].includes(activeNav);
+  const promptEditorNav = ['Prompt Editor', 'Favorites', 'Collections'].includes(activeNav);
   const showRightContextBuilder = promptEditorNav && Boolean(activePrompt);
+  const catalogTitle = activeNav === 'Built-in Actions' ? 'Built-in Actions' : activeNav;
+  const catalogDescription = activeNav === 'Built-in Actions'
+    ? 'Framework-neutral developer actions grouped by category. Select an action to open it in Prompt Studio.'
+    : activeNav === 'My Prompts'
+      ? 'Workspace prompts you created or saved. Select a prompt to open it in Prompt Studio.'
+      : 'Browse built-in, imported, and workspace prompts grouped by category. Select a prompt to open it in Prompt Studio.';
+  const catalogCountLabel = activeNav === 'Built-in Actions' ? 'actions' : 'prompts';
   const successfulExecutions = executionHistory.filter(item => item.status === 'success').length;
   const totalEstimatedInputTokens = executionHistory.reduce((sum, item) => sum + (item.usage.estimatedInputTokens ?? item.usage.actualInputTokens ?? 0), 0);
   const totalOutputTokens = executionHistory.reduce((sum, item) => sum + (item.usage.outputTokens ?? 0), 0);
@@ -1191,7 +1204,7 @@ export default function App() {
               <button type="button" className="button-secondary danger-text" onClick={handleDeletePrompt} disabled={!activePrompt}>Delete</button>
               <button type="button" className="button-primary" onClick={runPrompt} disabled={!activePrompt || isRunning}>{isRunning ? 'Running...' : 'Run Prompt'}</button>
             </>
-          ) : activeNav === 'Built-in Actions' ? (
+          ) : promptCatalogNav ? (
             <button type="button" className="button-secondary" onClick={handleCreatePrompt}>New Custom Prompt</button>
           ) : activeNav === 'Providers' ? (
             <button type="button" className="button-secondary" onClick={refreshProviders} disabled={isRefreshingProviders}>{isRefreshingProviders ? 'Refreshing...' : 'Refresh Providers'}</button>
@@ -1231,20 +1244,20 @@ export default function App() {
         />
 
         <main className="studio-main">
-          {activeNav === 'Built-in Actions' ? (
+          {promptCatalogNav ? (
             <section className="catalog-panel">
               <div className="catalog-header">
                 <div>
-                  <h1>Built-in Actions</h1>
-                  <p>Framework-neutral developer actions grouped by category. Select an action to open it in Prompt Studio.</p>
+                  <h1>{catalogTitle}</h1>
+                  <p>{catalogDescription}</p>
                 </div>
-                <span className="catalog-count">{visiblePrompts.filter(item => item.source === 'builtin').length} actions</span>
+                <span className="catalog-count">{visiblePrompts.length} {catalogCountLabel}</span>
               </div>
-              {builtInGroups.length === 0 ? (
-                <div className="library-empty">No built-in actions match the current search.</div>
+              {promptCatalogGroups.length === 0 ? (
+                <div className="library-empty">No prompts match the current search.</div>
               ) : (
                 <div className="catalog-sections">
-                  {builtInGroups.map(([category, items]) => (
+                  {promptCatalogGroups.map(([category, items]) => (
                     <details key={category} className="catalog-group" open>
                       <summary><span>{category}</span><span>{items.length}</span></summary>
                       <div className="catalog-grid">
@@ -1252,7 +1265,7 @@ export default function App() {
                           <div key={prompt.id} className="catalog-card prompt-catalog-card">
                             <button type="button" className="catalog-card-open" onClick={() => openPromptFromCatalog(prompt)}>
                               <span className="catalog-card-title">{prompt.name}</span>
-                              <span className="catalog-card-description">{prompt.description || 'Open this action in Prompt Studio.'}</span>
+                              <span className="catalog-card-description">{prompt.description || 'Open this prompt in Prompt Studio.'}</span>
                               <span className="catalog-card-meta">
                                 {prompt.tags.slice(0, 3).map(tag => <em key={tag}>{tag}</em>)}
                               </span>
@@ -1420,7 +1433,7 @@ export default function App() {
 
               {activePrompt && (
                 <>
-                  <PromptEditor prompt={activePrompt} dirty={activeDirty} onChange={updateActivePrompt} />
+                  <PromptEditor prompt={activePrompt} skills={skills} dirty={activeDirty} onChange={updateActivePrompt} />
 
                   <div className="chip-row">
                     {enabledContext.map(binding => (
