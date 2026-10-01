@@ -208,7 +208,9 @@ export default function App() {
   const [executionHistory, setExecutionHistory] = useState<PromptExecutionRecord[]>([]);
   const [unsupportedContextTypes, setUnsupportedContextTypes] = useState<string[]>([]);
   const [activeNav, setActiveNav] = useState(
-    defaultState?.activeNav === 'Prompt Studio' ? 'All Prompts' : (defaultState?.activeNav ?? 'All Prompts'),
+    defaultState?.activeNav === 'Prompt Studio' || defaultState?.activeNav === 'Context Builder'
+      ? 'All Prompts'
+      : (defaultState?.activeNav ?? 'All Prompts'),
   );
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(defaultState?.selectedCollectionId ?? null);
   const [searchQuery, setSearchQuery] = useState(defaultState?.searchQuery ?? '');
