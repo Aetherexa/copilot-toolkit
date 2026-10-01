@@ -337,3 +337,126 @@ test('WorkflowHistoryStore keeps newest 30 records and supports delete and clear
   await store.clear();
   assert.deepEqual(store.load(), []);
 });
+
+
+test('WorkflowEngine history helpers delegate to the bounded history store', async () => {
+  const stub = createExecutionStub();
+  const { workflowEngine } = createEngine(stub.engine);
+  const workflow = createWorkflow([
+    { id: 'step-1', name: 'First', inlinePrompt: 'First body', enabled: true },
+  ]);
+
+  const result = await workflowEngine.runWorkflow(workflow, [], () => undefined);
+  assert.equal(workflowEngine.getHistory().length, 1);
+  assert.equal(workflowEngine.getHistory()[0]?.id, result.record.id);
+
+  const afterDelete = await workflowEngine.deleteHistory(result.record.id);
+  assert.deepEqual(afterDelete, []);
+
+  await workflowEngine.runWorkflow(workflow, [], () => undefined);
+  await workflowEngine.clearHistory();
+  assert.deepEqual(workflowEngine.getHistory(), []);
+});
+
+test('WorkflowEngine records thrown step failures and stops by default', async () => {
+  const executionEngine = {
+    async preparePrompt() {
+      throw new Error('context resolution exploded');
+    },
+    async executePreparedPrompt() {
+      throw new Error('should not execute');
+    },
+    cancel() {
+      return false;
+    },
+  } as unknown as ExecutionEngine;
+  const { workflowEngine } = createEngine(executionEngine);
+  const workflow = createWorkflow([
+    { id: 'step-1', name: 'Broken', inlinePrompt: 'Broken body', enabled: true },
+    { id: 'step-2', name: 'Never', inlinePrompt: 'Never runs', enabled: true },
+  ]);
+  const progress: PromptExecutionProgress[] = [];
+
+  const result = await workflowEngine.runWorkflow(workflow, [], event => {
+    progress.push({
+      executionId: event.executionId,
+      providerId: 'workflow',
+      status: event.status,
+      error: event.error,
+    });
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.record.status, 'error');
+  assert.equal(result.record.steps.length, 1);
+  assert.equal(result.record.steps[0]?.stepName, 'Broken');
+  assert.equal(result.record.steps[0]?.status, 'error');
+  assert.match(result.record.error ?? '', /context resolution exploded/);
+  assert.ok(progress.some(item => item.status === 'error'));
+});
+
+test('WorkflowEngine can continue after an exception when the step opts in', async () => {
+  let calls = 0;
+  const fallbackStub = createExecutionStub();
+  const executionEngine = {
+    async preparePrompt(prompt: PromptDefinition, extraContext: ResolvedContext[] = []) {
+      calls += 1;
+      if (calls === 1) {
+        throw new Error('temporary preparation error');
+      }
+      return fallbackStub.engine.preparePrompt(prompt, extraContext);
+    },
+    async executePreparedPrompt(
+      prompt: PromptDefinition,
+      prepared: PreparedPromptExecution,
+      onProgress: (event: PromptExecutionProgress) => void,
+    ) {
+      return fallbackStub.engine.executePreparedPrompt(prompt, prepared, onProgress);
+    },
+    cancel(executionId: string) {
+      return fallbackStub.engine.cancel(executionId);
+    },
+  } as unknown as ExecutionEngine;
+  const { workflowEngine } = createEngine(executionEngine);
+  const workflow = createWorkflow([
+    { id: 'step-1', name: 'First', inlinePrompt: 'Fail preparation', enabled: true, continueOnFailure: true },
+    { id: 'step-2', name: 'Second', inlinePrompt: 'Continue', enabled: true },
+  ]);
+
+  const result = await workflowEngine.runWorkflow(workflow, [], () => undefined);
+
+  assert.equal(result.success, true);
+  assert.equal(result.record.steps[0]?.status, 'error');
+  assert.equal(result.record.steps[1]?.status, 'success');
+  assert.deepEqual(fallbackStub.executed, ['Second']);
+});
+
+test('WorkflowEngine completes an empty or fully disabled workflow without invoking the provider', async () => {
+  const stub = createExecutionStub();
+  const { workflowEngine } = createEngine(stub.engine);
+  const workflow = createWorkflow([
+    { id: 'disabled', name: 'Disabled', inlinePrompt: 'Skip', enabled: false },
+  ]);
+
+  const result = await workflowEngine.runWorkflow(workflow, [], () => undefined);
+
+  assert.equal(result.success, true);
+  assert.equal(result.record.status, 'success');
+  assert.deepEqual(result.record.steps, []);
+  assert.equal(result.record.finalOutput, '');
+  assert.deepEqual(stub.executed, []);
+});
+
+test('WorkflowEngine cancel returns false for an unknown or completed execution', async () => {
+  const stub = createExecutionStub();
+  const { workflowEngine } = createEngine(stub.engine);
+
+  assert.equal(workflowEngine.cancel('missing'), false);
+
+  const workflow = createWorkflow([
+    { id: 'step-1', name: 'First', inlinePrompt: 'Run', enabled: true },
+  ]);
+  const result = await workflowEngine.runWorkflow(workflow, [], () => undefined);
+
+  assert.equal(workflowEngine.cancel(result.record.id), false);
+});

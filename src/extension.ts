@@ -13,6 +13,7 @@ import { registerStudioCommands } from './app/registerCommands';
 import { getConfigPath, getWorkspaceRoot } from './app/workspace';
 import { redactSecrets } from './services/SecretRedactor';
 import { isSensitiveFilePath } from './services/workspaceFileFilters';
+import { getBuiltInPrompts as getBuiltInActionCatalog } from './prompts/BuiltInPrompts';
 
 // ─── Prompt item type ─────────────────────────────────────────────────────────
 
@@ -24,38 +25,12 @@ interface PromptItem extends vscode.QuickPickItem {
 // ─── Built-in prompts ─────────────────────────────────────────────────────────
 
 function getBuiltInPrompts(): PromptItem[] {
-  return [
-    {
-      label: '⚡ Built-in: Explain Component',
-      description: 'Purpose · Data flow · Side effects · Dependencies',
-      source: 'builtin',
-      body: 'Explain the following code clearly based on the provided engineering instructions. Cover: purpose, inputs and outputs, data flow, side effects, dependencies, and any non-obvious behaviour a developer should know about.',
-    },
-    {
-      label: '⚡ Built-in: Debug Issue',
-      description: 'Root cause analysis + fix steps',
-      source: 'builtin',
-      body: 'Analyse the following code and identify all bugs and issues based on the provided engineering instructions. For each problem: state the root cause, explain why it occurs, provide a concrete fix, and flag any remaining edge cases.',
-    },
-    {
-      label: '⚡ Built-in: Performance Analysis',
-      description: 'Bottlenecks · Complexity · Memory · Optimisations',
-      source: 'builtin',
-      body: 'Analyse the following code for performance issues based on the provided engineering instructions. For every issue: describe the impact, rate its severity (high / medium / low), and provide an optimised alternative implementation.',
-    },
-    {
-      label: '⚡ Built-in: Safe Refactor',
-      description: 'Clean code · Readability · No behaviour change',
-      source: 'builtin',
-      body: 'Refactor the following code to improve quality WITHOUT changing observable behaviour, following the provided engineering instructions. Present the refactored version with a brief bullet list explaining each change made.',
-    },
-    {
-      label: '⚡ Built-in: Pre-PR Review',
-      description: 'Code quality · Error handling · Best practices',
-      source: 'builtin',
-      body: 'Review this code based on the provided engineering instructions before it is merged via Pull Request. For each issue found, state: severity (critical / warning / suggestion), location, and a recommended fix.',
-    },
-  ];
+  return getBuiltInActionCatalog().map(prompt => ({
+    label: `⚡ Built-in: ${prompt.name}`,
+    description: prompt.description,
+    source: 'builtin',
+    body: prompt.body,
+  }));
 }
 
 // ─── Skill loader / picker / merger ──────────────────────────────────────────

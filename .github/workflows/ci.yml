@@ -119,6 +119,10 @@ jobs:
       - name: Compile and typecheck
         run: npm run compile
 
+      - name: Generate LCOV coverage for Sonar
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        run: npm run test:coverage:lcov
+
       - name: Validate Sonar configuration
         id: sonar-config
         shell: bash
@@ -152,6 +156,8 @@ jobs:
           args: >
             -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ env.SONAR_ORGANIZATION }}
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
 
   package:
     name: Package VSIX

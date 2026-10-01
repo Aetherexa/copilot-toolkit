@@ -139,6 +139,7 @@ export function Sidebar({
                 >
                   <span className="library-item-title">{workflow.name}</span>
                   <span className="library-item-meta">{workflow.steps.length} step{workflow.steps.length === 1 ? '' : 's'}</span>
+                  <span className="library-item-badge">{workflow.source ?? 'workspace'}</span>
                 </button>
               ))}
           </div>
