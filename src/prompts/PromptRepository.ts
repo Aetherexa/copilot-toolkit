@@ -14,6 +14,7 @@ import { getBuiltInPrompts } from './BuiltInPrompts';
 
 const PROMPTS_KEY = 'copilotToolkit.studioPrompts';
 const COLLECTIONS_KEY = 'copilotToolkit.promptCollections';
+const FAVORITES_KEY = 'copilotToolkit.favoritePromptIds';
 
 interface StoredPromptState {
   prompts: PromptDefinition[];
@@ -135,11 +136,22 @@ export class PromptRepository {
   async loadSnapshot(): Promise<PromptRepositorySnapshot> {
     const stored = this.loadStoredState();
     const imported = this.loadImportedPrompts();
-    const merged = new Map<string, PromptDefinition>();
+    const favoriteIds = new Set(this.state.get<string[]>(FAVORITES_KEY, []));
 
+    // Preserve favorites created before favorite IDs were stored independently.
+    for (const prompt of stored.prompts) {
+      if (prompt.favorite) {
+        favoriteIds.add(prompt.id);
+      }
+    }
+
+    const merged = new Map<string, PromptDefinition>();
     for (const prompt of [...getBuiltInPrompts(), ...stored.prompts, ...imported]) {
       if (!merged.has(prompt.id)) {
-        merged.set(prompt.id, prompt);
+        merged.set(prompt.id, {
+          ...prompt,
+          favorite: favoriteIds.has(prompt.id),
+        });
       }
     }
 
@@ -231,15 +243,28 @@ export class PromptRepository {
   }
 
   async setFavorite(promptId: string, favorite: boolean): Promise<PromptRepositorySnapshot> {
-    const stored = this.loadStoredState();
-    const prompt = stored.prompts.find(item => item.id === promptId);
-    if (!prompt) {
-      throw new Error('Only workspace prompts can be favorited persistently.');
+    const snapshot = await this.loadSnapshot();
+    if (!snapshot.prompts.some(prompt => prompt.id === promptId)) {
+      throw new Error('Prompt not found.');
     }
 
-    prompt.favorite = favorite;
-    prompt.updatedAt = timestamp();
-    await this.saveStoredState(stored);
+    const favoriteIds = new Set(this.state.get<string[]>(FAVORITES_KEY, []));
+    if (favorite) {
+      favoriteIds.add(promptId);
+    } else {
+      favoriteIds.delete(promptId);
+    }
+    await this.state.update(FAVORITES_KEY, [...favoriteIds]);
+
+    // Keep the legacy flag synchronized for saved workspace prompts.
+    const stored = this.loadStoredState();
+    const workspacePrompt = stored.prompts.find(item => item.id === promptId);
+    if (workspacePrompt) {
+      workspacePrompt.favorite = favorite;
+      workspacePrompt.updatedAt = timestamp();
+      await this.saveStoredState(stored);
+    }
+
     return this.loadSnapshot();
   }
 
