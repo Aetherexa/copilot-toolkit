@@ -2,6 +2,12 @@
 
 [![CI](https://github.com/Aetherexa/copilot-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Aetherexa/copilot-toolkit/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Aetherexa/copilot-toolkit/actions/workflows/codeql.yml/badge.svg)](https://github.com/Aetherexa/copilot-toolkit/actions/workflows/codeql.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Aetherexa_copilot-toolkit&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Aetherexa_copilot-toolkit)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=Aetherexa_copilot-toolkit&metric=coverage)](https://sonarcloud.io/summary/new_code?id=Aetherexa_copilot-toolkit)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=Aetherexa_copilot-toolkit&metric=bugs)](https://sonarcloud.io/summary/new_code?id=Aetherexa_copilot-toolkit)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=Aetherexa_copilot-toolkit&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=Aetherexa_copilot-toolkit)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=Aetherexa_copilot-toolkit&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=Aetherexa_copilot-toolkit)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=Aetherexa_copilot-toolkit&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=Aetherexa_copilot-toolkit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Copilot Toolkit is a VS Code extension for building, testing, and reusing context-aware AI prompts and multi-step developer workflows without leaving the editor.
@@ -218,6 +224,12 @@ Legacy Markdown prompts are loaded into the Studio without being silently delete
 - VS Code 1.90 or later
 - GitHub Copilot access for AI execution
 - Node.js 22+ for repository development/release tooling
+
+## Code quality status
+
+The badges at the top of this README are live SonarQube Cloud metrics for `Aetherexa_copilot-toolkit`. They update after the authoritative Sonar scan on `main` and provide a quick view of the current Quality Gate, coverage, bugs, vulnerabilities, code smells, and duplicated-line density.
+
+The full SonarQube Cloud dashboard is available from any Sonar badge.
 
 ## Development
 
