@@ -220,3 +220,35 @@ test('PromptAssembler excludes contexts marked as excluded', () => {
   assert.match(output, /Current File/);
   assert.doesNotMatch(output, /Git Diff/);
 });
+
+test('PromptAssembler includes project instructions and selected skills before the task', () => {
+  const assembler = new PromptAssembler({
+    list: () => [
+      { id: 'security', name: 'Security', sourcePath: '.copilot/skills/security.md' },
+    ],
+    resolve: skillIds => skillIds.includes('security')
+      ? [{
+        id: 'security',
+        name: 'Security',
+        sourcePath: '.copilot/skills/security.md',
+        content: 'Review authentication and input validation.',
+      }]
+      : [],
+    loadProjectInstructions: () => ({
+      sourcePath: '.github/copilot-instructions.md',
+      content: 'Follow repository conventions.',
+    }),
+  });
+
+  const output = assembler.assemble({
+    ...makePrompt(),
+    skillIds: ['security'],
+  }, []);
+
+  assert.match(output, /# Project Instructions/);
+  assert.match(output, /Follow repository conventions/);
+  assert.match(output, /# Skills/);
+  assert.match(output, /## Security/);
+  assert.match(output, /Review authentication and input validation/);
+  assert.ok(output.indexOf('# Skills') < output.indexOf('# Task'));
+});
