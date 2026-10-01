@@ -693,16 +693,15 @@ export default function App() {
     closeTab(activeTab.id);
   }
 
-  function handleFavoriteToggle(): void {
-    if (!activePrompt || activePrompt.source !== 'workspace') {
-      setError('Only workspace prompts can be favorited. Use Save As first for built-in or imported prompts.');
+  function handleFavoriteToggle(prompt: PromptDefinition | null = activePrompt): void {
+    if (!prompt) {
       return;
     }
 
     pendingActionRef.current = { kind: 'refreshOnly' };
     postMessage({
       type: 'prompt.favorite',
-      payload: { promptId: activePrompt.id, favorite: !activePrompt.favorite },
+      payload: { promptId: prompt.id, favorite: !prompt.favorite },
     });
   }
 
@@ -1187,7 +1186,7 @@ export default function App() {
               <button type="button" className="button-secondary" onClick={() => void handleSave()} disabled={!activePrompt || isSaving}>{isSaving ? 'Saving...' : 'Save'}</button>
               <button type="button" className="button-secondary" onClick={() => void handleSaveAs()} disabled={!activePrompt || isSaving}>Save As</button>
               <button type="button" className="button-secondary" onClick={handleDuplicatePrompt} disabled={!activePrompt}>Duplicate</button>
-              <button type="button" className="button-secondary" onClick={handleFavoriteToggle} disabled={!activePrompt || activePrompt.source !== 'workspace'}>{activePrompt?.favorite ? 'Unfavorite' : 'Favorite'}</button>
+              <button type="button" className="button-secondary" onClick={() => handleFavoriteToggle()} disabled={!activePrompt}>{activePrompt?.favorite ? 'Unfavorite' : 'Favorite'}</button>
               <button type="button" className="button-secondary" onClick={handleExportPrompt} disabled={!activePrompt}>Export</button>
               <button type="button" className="button-secondary danger-text" onClick={handleDeletePrompt} disabled={!activePrompt}>Delete</button>
               <button type="button" className="button-primary" onClick={runPrompt} disabled={!activePrompt || isRunning}>{isRunning ? 'Running...' : 'Run Prompt'}</button>
@@ -1214,6 +1213,7 @@ export default function App() {
           activePromptForCollection={activePrompt}
           getCollectionPrompts={getCollectionPrompts}
           onSelectPrompt={openPromptInTab}
+          onToggleFavorite={handleFavoriteToggle}
           onSelectNav={handleSelectNav}
           onSearchChange={setSearchQuery}
           onCreatePrompt={handleCreatePrompt}
@@ -1249,13 +1249,25 @@ export default function App() {
                       <summary><span>{category}</span><span>{items.length}</span></summary>
                       <div className="catalog-grid">
                         {items.map(prompt => (
-                          <button key={prompt.id} type="button" className="catalog-card" onClick={() => openPromptFromCatalog(prompt)}>
-                            <span className="catalog-card-title">{prompt.name}</span>
-                            <span className="catalog-card-description">{prompt.description || 'Open this action in Prompt Studio.'}</span>
-                            <span className="catalog-card-meta">
-                              {prompt.tags.slice(0, 3).map(tag => <em key={tag}>{tag}</em>)}
-                            </span>
-                          </button>
+                          <div key={prompt.id} className="catalog-card prompt-catalog-card">
+                            <button type="button" className="catalog-card-open" onClick={() => openPromptFromCatalog(prompt)}>
+                              <span className="catalog-card-title">{prompt.name}</span>
+                              <span className="catalog-card-description">{prompt.description || 'Open this action in Prompt Studio.'}</span>
+                              <span className="catalog-card-meta">
+                                {prompt.tags.slice(0, 3).map(tag => <em key={tag}>{tag}</em>)}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              className={`prompt-favorite-button catalog-favorite-button${prompt.favorite ? ' is-favorite' : ''}`}
+                              aria-label={prompt.favorite ? `Remove ${prompt.name} from favorites` : `Add ${prompt.name} to favorites`}
+                              aria-pressed={Boolean(prompt.favorite)}
+                              title={prompt.favorite ? 'Remove from favorites' : 'Add to favorites'}
+                              onClick={() => handleFavoriteToggle(prompt)}
+                            >
+                              {prompt.favorite ? '★' : '☆'}
+                            </button>
+                          </div>
                         ))}
                       </div>
                     </details>
