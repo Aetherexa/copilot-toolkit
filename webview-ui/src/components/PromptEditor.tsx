@@ -5,6 +5,7 @@ interface PromptEditorProps {
   prompt: PromptDefinition;
   dirty: boolean;
   onChange: (prompt: PromptDefinition) => void;
+  onFavoriteToggle: () => void;
 }
 
 function updateTags(value: string): string[] {
@@ -14,7 +15,7 @@ function updateTags(value: string): string[] {
     .filter(Boolean);
 }
 
-export function PromptEditor({ prompt, dirty, onChange }: PromptEditorProps) {
+export function PromptEditor({ prompt, dirty, onChange, onFavoriteToggle }: PromptEditorProps) {
   const update = (field: keyof PromptDefinition) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = event.target.value;
     if (field === 'tags') {
@@ -32,6 +33,15 @@ export function PromptEditor({ prompt, dirty, onChange }: PromptEditorProps) {
           <h1>{prompt.name}</h1>
           <p>{dirty ? 'Unsaved changes' : 'Saved prompt definition'}</p>
         </div>
+        <button
+          type="button"
+          className={`favorite-star${prompt.favorite ? ' is-favorite' : ''}`}
+          onClick={onFavoriteToggle}
+          aria-label={prompt.favorite ? 'Remove from favorites' : 'Add to favorites'}
+          title={prompt.favorite ? 'Remove from favorites' : 'Add to favorites'}
+        >
+          {prompt.favorite ? '★' : '☆'}
+        </button>
       </div>
 
       <div className="editor-form-grid">
