@@ -30,7 +30,7 @@ interface SidebarProps {
 }
 
 const navItems = [
-  'Prompt Studio',
+  'All Prompts',
   'Favorites',
   'My Prompts',
   'Built-in Actions',
@@ -50,6 +50,8 @@ function titleForNav(activeNav: string): string {
       return 'My Prompts';
     case 'Built-in Actions':
       return 'Built-in Actions';
+    case 'All Prompts':
+      return 'All Prompts';
     default:
       return 'Prompt Library';
   }
@@ -83,28 +85,33 @@ export function Sidebar({
   onAddPromptToCollection,
   onRemovePromptFromCollection,
 }: SidebarProps) {
+  const promptLibraryNav = ['All Prompts', 'Favorites', 'My Prompts'];
+  const utilityNav = ['Providers', 'Context Builder', 'Analytics', 'Settings'];
+  const showCreateTools = activeNav === 'Workflows' || promptLibraryNav.includes(activeNav) || activeNav === 'Collections';
+  const showSearch = activeNav === 'Workflows' || activeNav === 'Built-in Actions' || promptLibraryNav.includes(activeNav);
+
   return (
     <aside className="studio-sidebar">
-      <div className="sidebar-toolbar">
+      {showCreateTools && <div className="sidebar-toolbar">
         <button type="button" className="button-secondary sidebar-button" onClick={activeNav === 'Workflows' ? onCreateWorkflow : onCreatePrompt}>
           {activeNav === 'Workflows' ? 'New Workflow' : 'New Prompt'}
         </button>
         <button type="button" className="button-secondary sidebar-button" onClick={activeNav === 'Workflows' ? onImportWorkflow : onImport}>
           Import JSON
         </button>
-      </div>
+      </div>}
 
-      <label className="field sidebar-search">
+      {showSearch && <label className="field sidebar-search">
         <span>{activeNav === 'Workflows' ? 'Search Workflows' : 'Search Prompts'}</span>
         <input
           value={searchQuery}
           onChange={event => onSearchChange(event.target.value)}
           placeholder={activeNav === 'Workflows' ? 'Search by name or description' : 'Search by name, tag, category'}
         />
-      </label>
+      </label>}
 
       <div className="sidebar-section">
-        <div className="sidebar-title">Prompt Studio</div>
+        <div className="sidebar-title">Studio Navigation</div>
         <nav className="sidebar-nav" aria-label="Studio navigation">
           {navItems.map(item => (
             <button
@@ -121,28 +128,7 @@ export function Sidebar({
 
       {activeNav === 'Workflows' ? (
         <div className="sidebar-section sidebar-library">
-          <div className="sidebar-title">Workflows</div>
-          <div className="sidebar-list" role="list">
-            {workflows.length === 0 && <div className="library-empty">No workflows yet.</div>}
-            {workflows
-              .filter(workflow => {
-                const query = searchQuery.trim().toLowerCase();
-                return !query || workflow.name.toLowerCase().includes(query) || (workflow.description ?? '').toLowerCase().includes(query);
-              })
-              .map(workflow => (
-                <button
-                  key={workflow.id}
-                  type="button"
-                  role="listitem"
-                  className={`library-item${activeWorkflowId === workflow.id ? ' is-active' : ''}`}
-                  onClick={() => onSelectWorkflow(workflow)}
-                >
-                  <span className="library-item-title">{workflow.name}</span>
-                  <span className="library-item-meta">{workflow.steps.length} step{workflow.steps.length === 1 ? '' : 's'}</span>
-                  <span className="library-item-badge">{workflow.source ?? 'workspace'}</span>
-                </button>
-              ))}
-          </div>
+          <div className="library-empty">Choose a workflow from the catalog in the main workspace.</div>
         </div>
       ) : activeNav === 'Collections' ? (
         <div className="sidebar-section sidebar-library">
@@ -204,7 +190,11 @@ export function Sidebar({
             })}
           </div>
         </div>
-      ) : (
+      ) : activeNav === 'Built-in Actions' ? (
+        <div className="sidebar-section sidebar-library">
+          <div className="library-empty">Built-in actions are grouped by category in the main workspace.</div>
+        </div>
+      ) : utilityNav.includes(activeNav) ? null : (
         <div className="sidebar-section sidebar-library">
           <div className="sidebar-title">{titleForNav(activeNav)}</div>
           <div className="sidebar-list" role="list">
