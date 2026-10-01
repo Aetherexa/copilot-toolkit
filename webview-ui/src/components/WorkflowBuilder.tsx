@@ -19,13 +19,20 @@ function updateStep(step: WorkflowStep, field: keyof WorkflowStep, value: unknow
 const WORKFLOW_CONTEXT_OPTIONS: Array<{ type: ContextType; label: string }> = [
   { type: 'currentFile', label: 'Current File' },
   { type: 'currentSelection', label: 'Selected Code' },
-  { type: 'gitDiff', label: 'Git Diff' },
+  { type: 'selectedFiles', label: 'Selected Files' },
   { type: 'relatedFiles', label: 'Related Files' },
-  { type: 'relatedTests', label: 'Related Tests' },
   { type: 'openEditors', label: 'Open Editors' },
+  { type: 'currentFolder', label: 'Current Folder' },
+  { type: 'gitDiff', label: 'Git Diff' },
+  { type: 'changedFiles', label: 'Changed Files' },
+  { type: 'gitBranch', label: 'Current Branch' },
+  { type: 'recentCommits', label: 'Recent Commits' },
+  { type: 'relatedTests', label: 'Related Tests' },
+  { type: 'relatedApis', label: 'Related APIs' },
   { type: 'workspaceSummary', label: 'Workspace Summary' },
   { type: 'architectureSummary', label: 'Architecture Summary' },
   { type: 'dependencyGraph', label: 'Dependency Graph' },
+  { type: 'currentFeature', label: 'Current Feature' },
 ];
 
 function cloneBindings(bindings: ContextBinding[]): ContextBinding[] {
@@ -89,18 +96,31 @@ export function WorkflowBuilder({ workflow, prompts, providers, dirty, onChange,
           return (
             <article key={step.id} className="workflow-step-card">
               <div className="workflow-step-head">
-                <div>
-                  <strong>{index + 1}. {step.name}</strong>
-                  <p>{step.enabled ? 'Enabled' : 'Disabled'}</p>
+                <div className="workflow-step-title">
+                  <span className="workflow-step-number">{index + 1}</span>
+                  <div>
+                    <strong>{step.name || `Step ${index + 1}`}</strong>
+                    <p>{step.enabled ? 'Enabled' : 'Disabled'} · {step.promptId ? 'Saved prompt' : 'Inline prompt'}</p>
+                  </div>
                 </div>
-                <div className="inline-actions">
-                  <button type="button" className="ghost-button" onClick={() => onMoveStep(step.id, -1)} disabled={index === 0}>Up</button>
-                  <button type="button" className="ghost-button" onClick={() => onMoveStep(step.id, 1)} disabled={index === workflow.steps.length - 1}>Down</button>
-                  <button type="button" className="ghost-button danger-text" onClick={() => onDeleteStep(step.id)}>Remove</button>
+                <div className="workflow-step-actions" aria-label={`Actions for ${step.name}`}>
+                  <button type="button" className="icon-button" onClick={() => onMoveStep(step.id, -1)} disabled={index === 0} title="Move step up" aria-label="Move step up">↑</button>
+                  <button type="button" className="icon-button" onClick={() => onMoveStep(step.id, 1)} disabled={index === workflow.steps.length - 1} title="Move step down" aria-label="Move step down">↓</button>
+                  <button type="button" className="icon-button danger-text" onClick={() => onDeleteStep(step.id)} title="Remove step" aria-label="Remove step">🗑</button>
                 </div>
               </div>
 
-              <div className="context-config-grid workflow-grid">
+              <label className="field workflow-inline-prompt">
+                <span>Inline Prompt</span>
+                <textarea
+                  value={step.inlinePrompt ?? ''}
+                  onChange={event => updateWorkflowStep(step.id, current => ({ ...current, inlinePrompt: event.target.value }))}
+                  placeholder={step.promptId ? 'Optional: override or extend the saved prompt for this step.' : 'Describe exactly what this workflow step should do.'}
+                  spellCheck={false}
+                />
+              </label>
+
+              <div className="workflow-controls-grid">
                 <label className="field compact-field">
                   <span>Step Name</span>
                   <input value={step.name} onChange={(event: ChangeEvent<HTMLInputElement>) => updateWorkflowStep(step.id, current => updateStep(current, 'name', event.target.value))} />
@@ -111,13 +131,9 @@ export function WorkflowBuilder({ workflow, prompts, providers, dirty, onChange,
                     value={step.promptId ?? ''}
                     onChange={event => updateWorkflowStep(step.id, current => ({ ...current, promptId: event.target.value || undefined }))}
                   >
-                    <option value="">Inline prompt</option>
+                    <option value="">Inline prompt only</option>
                     {promptOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                   </select>
-                </label>
-                <label className="field compact-field field-span-two">
-                  <span>Inline Prompt</span>
-                  <textarea value={step.inlinePrompt ?? ''} onChange={event => updateWorkflowStep(step.id, current => ({ ...current, inlinePrompt: event.target.value }))} spellCheck={false} />
                 </label>
                 <label className="field compact-field">
                   <span>Provider</span>
@@ -157,24 +173,27 @@ export function WorkflowBuilder({ workflow, prompts, providers, dirty, onChange,
               </div>
 
               {contextMode === 'custom' && (
-                <div className="workflow-step-flags" aria-label={`Context for ${step.name}`}>
-                  {WORKFLOW_CONTEXT_OPTIONS.map(option => (
-                    <label key={option.type} className="checkbox-field">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(step.contextBindings?.find(binding => binding.type === option.type)?.enabled)}
-                        onChange={() => updateWorkflowStep(step.id, current => ({
-                          ...current,
-                          contextBindings: toggleBinding(current.contextBindings ?? [], option.type, option.label),
-                        }))}
-                      />
-                      <span>{option.label}</span>
-                    </label>
-                  ))}
+                <div className="workflow-context-section">
+                  <div className="workflow-subheading">Step Context</div>
+                  <div className="workflow-step-flags workflow-context-flags" aria-label={`Context for ${step.name}`}>
+                    {WORKFLOW_CONTEXT_OPTIONS.map(option => (
+                      <label key={option.type} className="checkbox-field">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(step.contextBindings?.find(binding => binding.type === option.type)?.enabled)}
+                          onChange={() => updateWorkflowStep(step.id, current => ({
+                            ...current,
+                            contextBindings: toggleBinding(current.contextBindings ?? [], option.type, option.label),
+                          }))}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              <div className="workflow-step-flags">
+              <div className="workflow-step-flags workflow-behavior-flags">
                 <label className="checkbox-field">
                   <input type="checkbox" checked={step.enabled} onChange={event => updateWorkflowStep(step.id, current => ({ ...current, enabled: event.target.checked }))} />
                   <span>Enabled</span>

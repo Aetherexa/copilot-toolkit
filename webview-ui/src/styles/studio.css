@@ -135,6 +135,10 @@ details summary:focus-visible {
   min-height: 0;
 }
 
+.studio-grid.studio-grid-wide {
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+
 .studio-sidebar,
 .context-builder {
   min-height: calc(100vh - 68px);
@@ -282,11 +286,22 @@ details summary:focus-visible {
   padding: 18px;
   display: grid;
   gap: 14px;
+  align-content: start;
+}
+
+.studio-main > .context-builder {
+  min-height: auto;
+  border: 1px solid var(--studio-border);
+  border-radius: var(--studio-radius);
 }
 
 .prompt-tabs {
   display: flex;
+  align-items: flex-end;
   gap: 8px;
+  min-height: 42px;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .prompt-tab {
@@ -294,7 +309,13 @@ details summary:focus-visible {
   background: color-mix(in srgb, var(--studio-bg) 82%, var(--studio-sidebar));
   border-radius: 12px 12px 0 0;
   padding: 10px 14px;
-  min-width: 220px;
+  min-width: 180px;
+  max-width: 280px;
+  min-height: 40px;
+  height: auto;
+  flex: 0 0 auto;
+  align-self: flex-end;
+  align-items: center;
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -333,6 +354,15 @@ details summary:focus-visible {
   gap: 10px;
   min-height: 240px;
   align-content: center;
+}
+
+.empty-panel-top {
+  align-content: start;
+  min-height: 220px;
+}
+
+.empty-state-action {
+  width: fit-content;
 }
 
 .editor-panel,
@@ -871,6 +901,324 @@ details summary:focus-visible {
   opacity: 0.7;
 }
 
+.catalog-panel {
+  border: 1px solid var(--studio-border);
+  border-radius: var(--studio-radius);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--studio-card) 88%, transparent), color-mix(in srgb, var(--studio-bg) 96%, black 4%));
+  box-shadow: var(--studio-shadow);
+  padding: 18px;
+  display: grid;
+  gap: 16px;
+}
+
+.catalog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.catalog-header h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.catalog-header p {
+  margin: 6px 0 0;
+  color: var(--studio-muted);
+}
+
+.catalog-count {
+  white-space: nowrap;
+  border: 1px solid var(--studio-border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--studio-muted);
+  font-size: 12px;
+}
+
+.catalog-sections {
+  display: grid;
+  gap: 12px;
+}
+
+.catalog-group {
+  border: 1px solid var(--studio-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.catalog-group > summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--studio-sidebar) 55%, transparent);
+}
+
+.catalog-grid {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.catalog-card {
+  border: 1px solid var(--studio-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--studio-bg) 86%, transparent);
+  color: var(--studio-foreground);
+  padding: 14px;
+  min-height: 132px;
+  text-align: left;
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  cursor: pointer;
+}
+
+.catalog-card:hover {
+  background: var(--studio-hover);
+  border-color: var(--studio-focus);
+}
+
+.catalog-card-title {
+  font-weight: 700;
+}
+
+.catalog-card-description {
+  color: var(--studio-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.catalog-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.catalog-card-meta em,
+.provider-model-list em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--studio-muted);
+  border: 1px solid var(--studio-border);
+  border-radius: 999px;
+  padding: 3px 7px;
+}
+
+.workflow-catalog-card {
+  min-height: 150px;
+}
+
+.back-link {
+  width: fit-content;
+  border: 0;
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.workflow-step-list {
+  display: grid;
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.workflow-step-card {
+  border: 1px solid var(--studio-border);
+  border-radius: 12px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--studio-bg) 86%, transparent);
+  display: grid;
+  gap: 14px;
+}
+
+.workflow-step-head,
+.workflow-step-title,
+.workflow-step-actions {
+  display: flex;
+  align-items: center;
+}
+
+.workflow-step-head {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workflow-step-title {
+  gap: 10px;
+  min-width: 0;
+}
+
+.workflow-step-title p {
+  margin: 3px 0 0;
+  color: var(--studio-muted);
+  font-size: 12px;
+}
+
+.workflow-step-number {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--studio-hover) 70%, transparent);
+  font-weight: 700;
+}
+
+.workflow-step-actions {
+  gap: 6px;
+  margin-left: auto;
+}
+
+.icon-button {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid var(--studio-border);
+  background: transparent;
+  color: var(--studio-foreground);
+  cursor: pointer;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--studio-hover);
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.workflow-inline-prompt textarea {
+  min-height: 150px;
+  max-height: 320px;
+  overflow-y: auto;
+  resize: vertical;
+  font-family: var(--vscode-editor-font-family, Consolas, monospace);
+  line-height: 1.5;
+}
+
+.workflow-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.workflow-controls-grid select {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--studio-input-border);
+  background: var(--studio-input);
+  color: var(--studio-foreground);
+  padding: 8px 10px;
+}
+
+.workflow-context-section {
+  display: grid;
+  gap: 9px;
+  border-top: 1px solid var(--studio-border);
+  padding-top: 12px;
+}
+
+.workflow-subheading {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--studio-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.workflow-step-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.workflow-context-flags {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.workflow-behavior-flags {
+  border-top: 1px solid var(--studio-border);
+  padding-top: 12px;
+}
+
+.provider-overview-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.provider-overview-card {
+  cursor: default;
+}
+
+.provider-model-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.metric-card,
+.settings-card {
+  border: 1px solid var(--studio-border);
+  border-radius: 12px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--studio-bg) 86%, transparent);
+}
+
+.metric-card {
+  display: grid;
+  gap: 8px;
+}
+
+.metric-card span,
+.settings-card span,
+.settings-hint {
+  color: var(--studio-muted);
+}
+
+.metric-card strong {
+  font-size: 24px;
+}
+
+.settings-list {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-card {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-card code {
+  width: fit-content;
+  color: var(--vscode-textLink-foreground);
+  background: var(--studio-code);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+
+.settings-hint {
+  margin-top: 16px;
+}
+
 .studio-status {
   padding: 12px 20px;
   border-top: 1px solid var(--studio-border);
@@ -882,7 +1230,8 @@ details summary:focus-visible {
 }
 
 @media (max-width: 1240px) {
-  .studio-grid {
+  .studio-grid,
+  .studio-grid.studio-grid-wide {
     grid-template-columns: 240px minmax(0, 1fr);
   }
 
