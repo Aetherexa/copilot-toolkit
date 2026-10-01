@@ -13,10 +13,13 @@ export interface WorkflowStep {
   inputFromPreviousStep?: boolean;
 }
 
+export type WorkflowSource = 'builtin' | 'workspace';
+
 export interface Workflow {
   id: string;
   name: string;
   description?: string;
+  source?: WorkflowSource;
   steps: WorkflowStep[];
   createdAt: number;
   updatedAt: number;
