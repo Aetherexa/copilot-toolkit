@@ -25,6 +25,7 @@ export function getBuiltInWorkflows(): Workflow[] {
       id: 'workflow-pr-preparation',
       name: 'PR Readiness',
       description: 'Analyze change impact, review quality and tests, check security, then draft a grounded PR description.',
+      source: 'builtin',
       createdAt: BUILTIN_TIMESTAMP,
       updatedAt: BUILTIN_TIMESTAMP,
       steps: [
@@ -39,6 +40,7 @@ export function getBuiltInWorkflows(): Workflow[] {
       id: 'workflow-debug',
       name: 'Debug to Fix',
       description: 'Move from diagnosis to a safe fix plan, regression tests, and a final review.',
+      source: 'builtin',
       createdAt: BUILTIN_TIMESTAMP,
       updatedAt: BUILTIN_TIMESTAMP,
       steps: [
@@ -52,6 +54,7 @@ export function getBuiltInWorkflows(): Workflow[] {
       id: 'workflow-refactor',
       name: 'Safe Refactor',
       description: 'Review architecture, plan a behavior-preserving refactor, assess impact, strengthen tests, and review the result.',
+      source: 'builtin',
       createdAt: BUILTIN_TIMESTAMP,
       updatedAt: BUILTIN_TIMESTAMP,
       steps: [
@@ -66,6 +69,7 @@ export function getBuiltInWorkflows(): Workflow[] {
       id: 'workflow-test-hardening',
       name: 'Test Hardening',
       description: 'Find weak coverage, discover edge cases, generate focused tests, and review the resulting test strategy.',
+      source: 'builtin',
       createdAt: BUILTIN_TIMESTAMP,
       updatedAt: BUILTIN_TIMESTAMP,
       steps: [
@@ -79,6 +83,7 @@ export function getBuiltInWorkflows(): Workflow[] {
       id: 'workflow-security-hardening',
       name: 'Security Hardening',
       description: 'Build a lightweight threat model, review concrete risks, plan fixes, and define security-focused validation.',
+      source: 'builtin',
       createdAt: BUILTIN_TIMESTAMP,
       updatedAt: BUILTIN_TIMESTAMP,
       steps: [
@@ -92,6 +97,7 @@ export function getBuiltInWorkflows(): Workflow[] {
       id: 'workflow-performance-investigation',
       name: 'Performance Investigation',
       description: 'Identify likely performance risks, review async behavior, define measurements, then validate optimization ideas.',
+      source: 'builtin',
       createdAt: BUILTIN_TIMESTAMP,
       updatedAt: BUILTIN_TIMESTAMP,
       steps: [
@@ -111,6 +117,7 @@ export function getBuiltInWorkflows(): Workflow[] {
       id: 'workflow-api-change-safety',
       name: 'API Change Safety',
       description: 'Review an API change for contract clarity, compatibility, tests, and documentation.',
+      source: 'builtin',
       createdAt: BUILTIN_TIMESTAMP,
       updatedAt: BUILTIN_TIMESTAMP,
       steps: [
@@ -124,6 +131,7 @@ export function getBuiltInWorkflows(): Workflow[] {
       id: 'workflow-dependency-upgrade',
       name: 'Dependency Upgrade',
       description: 'Plan an upgrade, analyze repository impact and compatibility, then define focused validation.',
+      source: 'builtin',
       createdAt: BUILTIN_TIMESTAMP,
       updatedAt: BUILTIN_TIMESTAMP,
       steps: [
@@ -137,6 +145,7 @@ export function getBuiltInWorkflows(): Workflow[] {
       id: 'workflow-onboarding-docs',
       name: 'Codebase Onboarding',
       description: 'Turn unfamiliar code into a clear mental model, architecture explanation, and developer documentation.',
+      source: 'builtin',
       createdAt: BUILTIN_TIMESTAMP,
       updatedAt: BUILTIN_TIMESTAMP,
       steps: [
@@ -149,6 +158,7 @@ export function getBuiltInWorkflows(): Workflow[] {
       id: 'workflow-production-readiness',
       name: 'Production Readiness',
       description: 'Review reliability, observability, security, performance, and test gaps before release.',
+      source: 'builtin',
       createdAt: BUILTIN_TIMESTAMP,
       updatedAt: BUILTIN_TIMESTAMP,
       steps: [
