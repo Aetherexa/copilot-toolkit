@@ -261,6 +261,47 @@ details summary:focus-visible {
   gap: 4px;
 }
 
+.prompt-library-item {
+  position: relative;
+}
+
+.prompt-library-open {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.prompt-favorite-button {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--studio-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.prompt-favorite-button:hover {
+  background: var(--studio-hover);
+  color: var(--studio-foreground);
+}
+
+.prompt-favorite-button:focus-visible {
+  outline: 1px solid var(--studio-focus);
+  outline-offset: 1px;
+}
+
+.prompt-favorite-button.is-favorite {
+  color: var(--vscode-charts-yellow, #cca700);
+}
+
 .library-item-title {
   font-weight: 600;
 }
@@ -982,6 +1023,31 @@ details summary:focus-visible {
 .catalog-card:hover {
   background: var(--studio-hover);
   border-color: var(--studio-focus);
+}
+
+.prompt-catalog-card {
+  position: relative;
+  cursor: default;
+}
+
+.catalog-card-open {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0 34px 0 0;
+  text-align: left;
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  cursor: pointer;
+}
+
+.catalog-favorite-button {
+  top: 9px;
+  right: 9px;
 }
 
 .catalog-card-title {
