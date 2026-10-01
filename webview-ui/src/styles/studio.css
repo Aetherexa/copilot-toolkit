@@ -424,6 +424,31 @@ details summary:focus-visible {
   margin-bottom: 18px;
 }
 
+.favorite-star {
+  width: 38px;
+  height: 38px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--studio-muted);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.favorite-star:hover {
+  background: var(--studio-hover);
+  color: var(--studio-foreground);
+}
+
+.favorite-star.is-favorite {
+  color: var(--vscode-charts-yellow, #cca700);
+  background: color-mix(in srgb, var(--vscode-charts-yellow, #cca700) 12%, transparent);
+}
+
 .editor-header h1,
 .context-builder h2 {
   margin: 0;
