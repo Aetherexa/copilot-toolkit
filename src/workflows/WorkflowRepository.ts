@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { Workflow, WorkflowExportPayload, WorkflowRepositorySnapshot, WorkflowStep } from '../domain/workflow';
+import { getBuiltInWorkflows } from './BuiltInWorkflows';
 
 const WORKFLOWS_KEY = 'copilotToolkit.workflows';
 
@@ -40,56 +41,6 @@ function normalizeWorkflow(workflow: Workflow): Workflow {
   };
 }
 
-function createSeedWorkflow(): Workflow {
-  const now = timestamp();
-  return {
-    id: 'workflow-pr-preparation',
-    name: 'PR Preparation',
-    description: 'Review changes, assess architecture, generate tests, then draft a PR summary.',
-    createdAt: now,
-    updatedAt: now,
-    steps: [
-      { id: 'wf-step-review', name: 'Review Changes', enabled: true, promptId: 'studio-react-pr-review' },
-      { id: 'wf-step-tests', name: 'Generate Tests', enabled: true, inlinePrompt: 'Generate focused regression and coverage tests for the reviewed changes.', inputFromPreviousStep: true },
-      { id: 'wf-step-final', name: 'Final Review', enabled: true, inlinePrompt: 'Summarize the most important issues, recommendations, and readiness concerns.', inputFromPreviousStep: true },
-      { id: 'wf-step-pr', name: 'PR Description', enabled: true, inlinePrompt: 'Draft a concise pull request description with summary, testing, and risks.', inputFromPreviousStep: true },
-    ],
-  };
-}
-
-function createDebugWorkflow(): Workflow {
-  const now = timestamp();
-  return {
-    id: 'workflow-debug',
-    name: 'Debug',
-    description: 'Analyze, identify root cause, propose a fix, and recommend validation tests.',
-    createdAt: now,
-    updatedAt: now,
-    steps: [
-      { id: 'wf-step-analyze', name: 'Analyze', enabled: true, inlinePrompt: 'Analyze the provided code and context. Identify symptoms, likely defects, and uncertainty.' },
-      { id: 'wf-step-root', name: 'Root Cause', enabled: true, inlinePrompt: 'Use the previous analysis to determine the most likely root cause.', inputFromPreviousStep: true },
-      { id: 'wf-step-fix', name: 'Fix Recommendation', enabled: true, inlinePrompt: 'Recommend the safest code fix with rationale.', inputFromPreviousStep: true },
-      { id: 'wf-step-test', name: 'Test Recommendation', enabled: true, inlinePrompt: 'Recommend targeted tests to validate the fix and prevent regressions.', inputFromPreviousStep: true },
-    ],
-  };
-}
-
-function createRefactorWorkflow(): Workflow {
-  const now = timestamp();
-  return {
-    id: 'workflow-refactor',
-    name: 'Refactor',
-    description: 'Analyze the current design, review architecture constraints, plan the refactor, and review the result.',
-    createdAt: now,
-    updatedAt: now,
-    steps: [
-      { id: 'wf-step-analyze-refactor', name: 'Analyze', enabled: true, inlinePrompt: 'Analyze the current code structure and identify maintainability issues.' },
-      { id: 'wf-step-arch-review', name: 'Architecture Review', enabled: true, inlinePrompt: 'Review the architectural impact and constraints of the proposed changes.', inputFromPreviousStep: true },
-      { id: 'wf-step-plan', name: 'Refactor Plan', enabled: true, inlinePrompt: 'Create a staged refactor plan that preserves behavior.', inputFromPreviousStep: true },
-      { id: 'wf-step-review-refactor', name: 'Review', enabled: true, inlinePrompt: 'Review the refactor plan for risk, scope, and validation needs.', inputFromPreviousStep: true },
-    ],
-  };
-}
 
 function sanitizeFileName(value: string): string {
   return value.replace(/[<>:"/\\|?*]+/g, '-').trim() || 'copilot-toolkit-workflow';
@@ -107,11 +58,17 @@ export class WorkflowRepository {
   constructor(private readonly state: vscode.Memento) {}
 
   async loadSnapshot(): Promise<WorkflowRepositorySnapshot> {
-    const stored = this.state.get<Workflow[]>(WORKFLOWS_KEY, []);
-    const workflows = stored.length > 0
-      ? stored.map(normalizeWorkflow)
-      : [createSeedWorkflow(), createDebugWorkflow(), createRefactorWorkflow()].map(normalizeWorkflow);
-    return { workflows };
+    const stored = this.state.get<Workflow[]>(WORKFLOWS_KEY, []).map(normalizeWorkflow);
+    const merged = new Map<string, Workflow>();
+
+    for (const workflow of getBuiltInWorkflows()) {
+      merged.set(workflow.id, workflow);
+    }
+    for (const workflow of stored) {
+      merged.set(workflow.id, workflow);
+    }
+
+    return { workflows: [...merged.values()] };
   }
 
   async createWorkflow(name = 'Untitled Workflow'): Promise<{ snapshot: WorkflowRepositorySnapshot; workflow: Workflow }> {
