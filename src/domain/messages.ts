@@ -3,6 +3,7 @@ import { PromptExecutionRecord, WorkflowExecutionRecord } from './execution';
 import { GraphView, IndexingStatus } from './graph';
 import { PromptCollection, PromptDefinition, PromptPreview } from './prompt';
 import { AIProvider } from './provider';
+import { SkillSummary } from './skill';
 import { Workflow } from './workflow';
 
 export interface StudioBootstrapPayload {
@@ -10,6 +11,7 @@ export interface StudioBootstrapPayload {
   collections: PromptCollection[];
   activePrompt: PromptDefinition;
   providers: AIProvider[];
+  skills: SkillSummary[];
   executionHistory: PromptExecutionRecord[];
   workflows: Workflow[];
   workflowHistory: WorkflowExecutionRecord[];
