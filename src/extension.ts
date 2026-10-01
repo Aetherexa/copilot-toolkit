@@ -862,11 +862,18 @@ async function selectMode(): Promise<ModeItem | undefined> {
 
 export function activate(context: vscode.ExtensionContext): void {
   const state = context.globalState;
-  const services = createServiceContainer(context);
+  let studioServices: ReturnType<typeof createServiceContainer> | undefined;
+
+  // Register the contributed Studio command first. Heavy Studio services are
+  // created lazily so a service initialization failure cannot leave the
+  // command visible in the palette but unregistered at runtime.
+  registerStudioCommands(context, () => {
+    studioServices ??= createServiceContainer(context);
+    return studioServices;
+  });
 
   // ── Edit tracker (must be first so it catches all edits) ───────────────────
   context.subscriptions.push(activateEditTracker(context));
-  registerStudioCommands(context, services);
 
   // ── Reset learning command ──────────────────────────────────────────────
   context.subscriptions.push(
