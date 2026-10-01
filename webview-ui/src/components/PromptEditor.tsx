@@ -1,8 +1,10 @@
 import { ChangeEvent } from 'react';
-import { PromptDefinition } from '../types';
+import { PromptDefinition, SkillSummary } from '../types';
+import { SkillSelector } from './SkillSelector';
 
 interface PromptEditorProps {
   prompt: PromptDefinition;
+  skills: SkillSummary[];
   dirty: boolean;
   onChange: (prompt: PromptDefinition) => void;
 }
@@ -14,7 +16,7 @@ function updateTags(value: string): string[] {
     .filter(Boolean);
 }
 
-export function PromptEditor({ prompt, dirty, onChange }: PromptEditorProps) {
+export function PromptEditor({ prompt, skills, dirty, onChange }: PromptEditorProps) {
   const update = (field: keyof PromptDefinition) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = event.target.value;
     if (field === 'tags') {
@@ -54,6 +56,13 @@ export function PromptEditor({ prompt, dirty, onChange }: PromptEditorProps) {
         <span>Tags</span>
         <input value={prompt.tags.join(', ')} onChange={update('tags')} placeholder="react, review, performance" />
       </label>
+
+      <SkillSelector
+        skills={skills}
+        selectedSkillIds={prompt.skillIds ?? []}
+        recommendationText={[prompt.name, prompt.description, prompt.category, prompt.tags.join(' '), prompt.body].filter(Boolean).join(' ')}
+        onChange={skillIds => onChange({ ...prompt, skillIds })}
+      />
 
       <label className="field field-editor">
         <span>Prompt body</span>
