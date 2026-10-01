@@ -492,13 +492,24 @@ details summary:focus-visible {
 }
 
 .field input,
-.field textarea {
+.field textarea,
+.field select {
   width: 100%;
   border-radius: 10px;
   border: 1px solid var(--studio-input-border);
   background: var(--studio-input);
   color: var(--studio-foreground);
   padding: 11px 12px;
+}
+
+.field select {
+  min-height: 92px;
+}
+
+.field-help {
+  color: var(--studio-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .field-editor textarea,
