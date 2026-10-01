@@ -74,26 +74,26 @@ export class SkillRepository implements SkillContentProvider {
       return fs.readdirSync(skillsFolder, { withFileTypes: true })
         .filter(entry => entry.isFile() && entry.name.toLowerCase().endsWith('.md'))
         .sort((left, right) => left.name.localeCompare(right.name))
-        .map(entry => {
+        .flatMap((entry): SkillDefinition[] => {
           const filePath = path.join(skillsFolder, entry.name);
           try {
             const content = fs.readFileSync(filePath, 'utf8').trim();
             if (!content) {
-              return undefined;
+              return [];
             }
 
-            return {
+            const description = extractDescription(content);
+            return [{
               id: toSkillId(entry.name),
               name: humanizeSkillName(entry.name),
-              description: extractDescription(content),
+              ...(description ? { description } : {}),
               sourcePath: this.relativeWorkspacePath(filePath) ?? entry.name,
               content,
-            };
+            }];
           } catch {
-            return undefined;
+            return [];
           }
-        })
-        .filter((skill): skill is SkillDefinition => Boolean(skill));
+        });
     } catch {
       return [];
     }
