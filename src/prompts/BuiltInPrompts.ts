@@ -21,6 +21,8 @@ function currentCodeContext(): ContextBinding[] {
 
 function changeContext(): ContextBinding[] {
   return [
+    binding('currentSelection', { maxTokens: 500, detail: 'high' }, 'Selected Code'),
+    binding('currentFile', { maxTokens: 700, detail: 'medium' }, 'Current File'),
     binding('gitDiff', { includeStaged: true, includeUnstaged: true, maxTokens: 1200 }, 'Git Diff'),
     binding('changedFiles', { maxFiles: 8, maxTokens: 220 }, 'Changed Files'),
     binding('relatedFiles', { maxFiles: 5, maxTokens: 240, depth: 2 }, 'Related Files'),
