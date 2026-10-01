@@ -1040,7 +1040,12 @@ export default function App() {
   }
 
   function deleteWorkflow(): void {
-    if (!workflowDraft || !window.confirm(`Delete workflow ${workflowDraft.name}? This cannot be undone.`)) return;
+    if (!workflowDraft) return;
+    if (workflowDraft.source === 'builtin') {
+      setMessage('Built-in workflows are protected. Duplicate it to create a workspace workflow.');
+      return;
+    }
+    if (!window.confirm(`Delete workflow ${workflowDraft.name}? This cannot be undone.`)) return;
     pendingWorkflowActionRef.current = 'first';
     postMessage({ type: 'workflow.delete', payload: { workflowId: workflowDraft.id } });
   }
@@ -1118,7 +1123,7 @@ export default function App() {
               <button type="button" className="button-secondary" onClick={saveWorkflow} disabled={!activeWorkflow || isSaving}>{isSaving ? 'Saving...' : 'Save Workflow'}</button>
               <button type="button" className="button-secondary" onClick={duplicateWorkflow} disabled={!activeWorkflow}>Duplicate</button>
               <button type="button" className="button-secondary" onClick={exportWorkflow} disabled={!activeWorkflow}>Export</button>
-              <button type="button" className="button-secondary danger-text" onClick={deleteWorkflow} disabled={!activeWorkflow}>Delete</button>
+              <button type="button" className="button-secondary danger-text" onClick={deleteWorkflow} disabled={!activeWorkflow || activeWorkflow.source === 'builtin'} title={activeWorkflow?.source === 'builtin' ? 'Duplicate built-in workflows before deleting' : undefined}>Delete</button>
               <button type="button" className="button-primary" onClick={runWorkflow} disabled={!activeWorkflow || Boolean(runningWorkflowExecutionId)}>{runningWorkflowExecutionId ? 'Running...' : 'Run Workflow'}</button>
             </>
           ) : (
