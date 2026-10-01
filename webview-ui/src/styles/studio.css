@@ -826,6 +826,47 @@ details summary:focus-visible {
   color: var(--studio-muted);
 }
 
+.selected-files-config {
+  display: grid;
+  gap: 8px;
+}
+
+.selected-files-toolbar,
+.selected-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.selected-files-toolbar > span {
+  color: var(--studio-muted);
+  font-size: 12px;
+}
+
+.selected-files-list {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.selected-file-row {
+  border: 1px solid var(--studio-border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--studio-bg) 90%, transparent);
+}
+
+.selected-file-row > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--vscode-editor-font-family, Consolas, monospace);
+  font-size: 11px;
+}
+
 .context-option.is-disabled {
   opacity: 0.7;
 }

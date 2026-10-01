@@ -9,6 +9,7 @@ import {
   CollectionRemovePromptRequest,
   CollectionRenameRequest,
   ContextPreviewRequest,
+  ContextFilesPickRequest,
   ExecutionCancelRequest,
   ExecutionClearRequest,
   ExecutionDeleteRequest,
@@ -171,6 +172,9 @@ export class PromptStudioPanel {
       case 'context.preview':
         await this.handlePreview(message);
         return;
+      case 'context.files.pick':
+        await this.handleFilePick(message);
+        return;
       case 'prompt.save':
         await this.handleSave(message);
         return;
@@ -264,6 +268,56 @@ export class PromptStudioPanel {
       default:
         this.postError('Invalid Studio message received.');
     }
+  }
+
+  private async handleFilePick(message: ContextFilesPickRequest): Promise<void> {
+    const selectedPaths = new Set(message.payload?.selectedPaths ?? []);
+    const [openFiles, workspaceFiles] = await Promise.all([
+      this.services.workspaceIndex.getOpenEditorFiles(),
+      this.services.workspaceIndex.getWorkspaceFiles(),
+    ]);
+    const openPaths = new Set(openFiles.map(file => file.relativePath));
+
+    interface FilePickItem extends vscode.QuickPickItem {
+      relativePath: string;
+      open: boolean;
+    }
+
+    const items: FilePickItem[] = workspaceFiles
+      .map(file => ({
+        label: file.name,
+        description: file.relativePath,
+        detail: openPaths.has(file.relativePath) ? 'Open editor' : 'Workspace file',
+        picked: selectedPaths.has(file.relativePath),
+        relativePath: file.relativePath,
+        open: openPaths.has(file.relativePath),
+      }))
+      .sort((left, right) => Number(right.open) - Number(left.open)
+        || left.relativePath.localeCompare(right.relativePath));
+
+    const picked = await vscode.window.showQuickPick(items, {
+      canPickMany: true,
+      matchOnDescription: true,
+      matchOnDetail: true,
+      placeHolder: 'Select up to 20 workspace files to pin as AI context. Open editors are shown first.',
+      title: 'Copilot Toolkit — Selected Files',
+    });
+
+    if (!picked) {
+      return;
+    }
+
+    if (picked.length > 20) {
+      vscode.window.showWarningMessage('Copilot Toolkit: Select at most 20 files for manual context.');
+      return;
+    }
+
+    this.postMessage({
+      type: 'context.files.selected',
+      payload: {
+        paths: picked.map(item => item.relativePath),
+      },
+    });
   }
 
   private async handlePreview(message: ContextPreviewRequest): Promise<void> {

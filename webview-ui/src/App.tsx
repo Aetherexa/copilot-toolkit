@@ -45,7 +45,7 @@ function clonePrompt(prompt: PromptDefinition): PromptDefinition {
     tags: [...prompt.tags],
     context: prompt.context.map(binding => ({
       ...binding,
-      options: binding.options ? { ...binding.options } : undefined,
+      options: binding.options ? { ...binding.options, filePaths: binding.options.filePaths ? [...binding.options.filePaths] : undefined } : undefined,
     })),
   };
 }
@@ -57,7 +57,7 @@ function cloneWorkflow(workflow: Workflow): Workflow {
       ...step,
       contextBindings: step.contextBindings?.map(binding => ({
         ...binding,
-        options: binding.options ? { ...binding.options } : undefined,
+        options: binding.options ? { ...binding.options, filePaths: binding.options.filePaths ? [...binding.options.filePaths] : undefined } : undefined,
       })),
     })),
   };
@@ -303,6 +303,45 @@ export default function App() {
         setIsSaving(false);
         pendingActionRef.current = null;
         setError('');
+      }
+
+      if (incoming.type === 'context.files.selected') {
+        const tabId = activeTabIdRef.current;
+        if (tabId) {
+          const paths = [...incoming.payload.paths];
+          setTabs(current => current.map(tab => {
+            if (tab.id !== tabId) {
+              return tab;
+            }
+            const existing = tab.prompt.context.find(binding => binding.type === 'selectedFiles');
+            const nextBinding: ContextBinding = {
+              ...(existing ?? { type: 'selectedFiles', enabled: true, label: 'Selected Files' }),
+              enabled: paths.length > 0,
+              label: 'Selected Files',
+              options: {
+                ...(existing?.options ?? {}),
+                maxTokens: existing?.options?.maxTokens ?? 500,
+                filePaths: paths,
+              },
+            };
+            return {
+              ...tab,
+              prompt: {
+                ...tab.prompt,
+                context: mergeContextBindings(
+                  tab.prompt.context.filter(binding => binding.type !== 'selectedFiles'),
+                  [nextBinding],
+                ),
+                updatedAt: Date.now(),
+              },
+            };
+          }));
+          setPreview(null);
+          setMessage(paths.length > 0
+            ? `Pinned ${paths.length} selected file${paths.length === 1 ? '' : 's'} as context.`
+            : 'Cleared selected file context.');
+          setError('');
+        }
       }
 
       if (incoming.type === 'context.previewResult') {
@@ -742,6 +781,53 @@ export default function App() {
       updatedAt: Date.now(),
     }));
     setPreview(current => current ? { ...current, resolvedContext: current.resolvedContext.filter(item => item.type !== type) } : current);
+  }
+
+  function pickSelectedFiles(): void {
+    if (!activePrompt) {
+      return;
+    }
+
+    const selectedPaths = activePrompt.context
+      .find(binding => binding.type === 'selectedFiles')
+      ?.options?.filePaths ?? [];
+    postMessage({
+      type: 'context.files.pick',
+      payload: { selectedPaths },
+    });
+  }
+
+  function removeSelectedFile(filePath: string): void {
+    if (!activePrompt) {
+      return;
+    }
+
+    updateCurrentTabPrompt(prompt => {
+      const existing = prompt.context.find(binding => binding.type === 'selectedFiles');
+      if (!existing) {
+        return prompt;
+      }
+
+      const remaining = (existing.options?.filePaths ?? []).filter(path => path !== filePath);
+      const nextBinding: ContextBinding = {
+        ...existing,
+        enabled: remaining.length > 0,
+        options: {
+          ...(existing.options ?? {}),
+          filePaths: remaining,
+        },
+      };
+
+      return {
+        ...prompt,
+        context: mergeContextBindings(
+          prompt.context.filter(binding => binding.type !== 'selectedFiles'),
+          [nextBinding],
+        ),
+        updatedAt: Date.now(),
+      };
+    });
+    setPreview(null);
   }
 
   function previewContext(): void {
@@ -1226,6 +1312,8 @@ export default function App() {
             onUpdateOptions={updateContextOptions}
             onBudgetChange={updateContextBudget}
             onApplySuggestion={applySuggestion}
+            onPickFiles={pickSelectedFiles}
+            onRemoveSelectedFile={removeSelectedFile}
             onPreview={previewContext}
             previewBusy={isPreviewing}
           />
