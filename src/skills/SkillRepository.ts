@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { getConfigPath, getWorkspaceRoot } from '../app/workspace';
 import {
   ProjectInstructions,
   SkillContentProvider,
@@ -15,11 +14,7 @@ export interface SkillRepositoryPaths {
 }
 
 function defaultPaths(): SkillRepositoryPaths {
-  return {
-    workspaceRoot: getWorkspaceRoot(),
-    skillsFolder: getConfigPath('skillsFolder'),
-    projectInstructionsFile: getConfigPath('skillFile'),
-  };
+  return {};
 }
 
 function toSkillId(fileName: string): string {
