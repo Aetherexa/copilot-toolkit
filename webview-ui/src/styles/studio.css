@@ -1360,3 +1360,136 @@ details summary:focus-visible {
     flex-direction: column;
   }
 }
+
+.skill-selector {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.skill-selector-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 600;
+}
+
+.skill-selector-count,
+.field-help {
+  color: var(--studio-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.skill-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--studio-border);
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: color-mix(in srgb, var(--studio-hover) 72%, transparent);
+  color: inherit;
+  cursor: pointer;
+}
+
+.skill-chip:hover {
+  border-color: var(--studio-focus);
+}
+
+.skill-picker {
+  position: relative;
+}
+
+.skill-picker > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--vscode-textLink-foreground, #3794ff);
+  user-select: none;
+}
+
+.skill-picker > summary::marker {
+  content: '';
+}
+
+.skill-picker-menu {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  padding: 8px;
+  background: var(--vscode-editor-background);
+}
+
+.skill-option {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.skill-option:hover,
+.skill-option.is-selected {
+  background: var(--studio-hover);
+  border-color: var(--studio-border);
+}
+
+.skill-option-check {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--studio-border);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.skill-option.is-selected .skill-option-check {
+  border-color: var(--studio-focus);
+}
+
+.skill-option-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.skill-option-copy span,
+.skill-picker-empty {
+  color: var(--studio-muted);
+  font-size: 12px;
+}
+
+.skill-recommended {
+  border: 1px solid var(--studio-border);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--studio-muted);
+  font-size: 10px;
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.field-help code,
+.skill-picker-empty code {
+  font-family: var(--vscode-editor-font-family);
+}
