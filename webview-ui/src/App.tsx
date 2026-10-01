@@ -694,8 +694,7 @@ export default function App() {
   }
 
   function handleFavoriteToggle(): void {
-    if (!activePrompt || activePrompt.source !== 'workspace') {
-      setError('Only workspace prompts can be favorited. Use Save As first for built-in or imported prompts.');
+    if (!activePrompt) {
       return;
     }
 
@@ -1187,7 +1186,6 @@ export default function App() {
               <button type="button" className="button-secondary" onClick={() => void handleSave()} disabled={!activePrompt || isSaving}>{isSaving ? 'Saving...' : 'Save'}</button>
               <button type="button" className="button-secondary" onClick={() => void handleSaveAs()} disabled={!activePrompt || isSaving}>Save As</button>
               <button type="button" className="button-secondary" onClick={handleDuplicatePrompt} disabled={!activePrompt}>Duplicate</button>
-              <button type="button" className="button-secondary" onClick={handleFavoriteToggle} disabled={!activePrompt || activePrompt.source !== 'workspace'}>{activePrompt?.favorite ? 'Unfavorite' : 'Favorite'}</button>
               <button type="button" className="button-secondary" onClick={handleExportPrompt} disabled={!activePrompt}>Export</button>
               <button type="button" className="button-secondary danger-text" onClick={handleDeletePrompt} disabled={!activePrompt}>Delete</button>
               <button type="button" className="button-primary" onClick={runPrompt} disabled={!activePrompt || isRunning}>{isRunning ? 'Running...' : 'Run Prompt'}</button>
@@ -1408,7 +1406,7 @@ export default function App() {
 
               {activePrompt && (
                 <>
-                  <PromptEditor prompt={activePrompt} dirty={activeDirty} onChange={updateActivePrompt} />
+                  <PromptEditor prompt={activePrompt} dirty={activeDirty} onChange={updateActivePrompt} onFavoriteToggle={handleFavoriteToggle} />
 
                   <div className="chip-row">
                     {enabledContext.map(binding => (
