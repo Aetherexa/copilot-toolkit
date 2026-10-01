@@ -25,6 +25,8 @@ import { PromptDefinition, PromptPreview, PromptRepositorySnapshot } from '../do
 import { Workflow } from '../domain/workflow';
 import { PromptRepository } from '../prompts/PromptRepository';
 import { PromptAssembler } from '../prompts/PromptAssembler';
+import { SkillRepository } from '../skills/SkillRepository';
+import { getConfigPath, getWorkspaceRoot } from './workspace';
 import { CopilotChatProvider } from '../providers/CopilotChatProvider';
 import { ProviderRegistry } from '../providers/ProviderRegistry';
 import { RegisteredProvider } from '../providers/RegisteredProvider';
@@ -46,6 +48,7 @@ export interface ServiceContainer {
   readonly contextEngine: ContextEngine;
   readonly promptAssembler: PromptAssembler;
   readonly promptRepository: PromptRepository;
+  readonly skillRepository: SkillRepository;
   readonly workflowRepository: WorkflowRepository;
   readonly providerRegistry: ProviderRegistry;
   readonly executionEngine: ExecutionEngine;
@@ -116,7 +119,12 @@ export function createServiceContainer(context: vscode.ExtensionContext): Servic
   contextRegistry.register(new CurrentFeatureResolver(graphQuery, tokenEstimator));
 
   const contextEngine = new ContextEngine(contextRegistry, contextRanker, tokenEstimator);
-  const promptAssembler = new PromptAssembler();
+  const skillRepository = new SkillRepository(() => ({
+    workspaceRoot: getWorkspaceRoot(),
+    skillsFolder: getConfigPath('skillsFolder'),
+    projectInstructionsFile: getConfigPath('skillFile'),
+  }));
+  const promptAssembler = new PromptAssembler(skillRepository);
   const promptRepository = new PromptRepository(context.workspaceState);
   const workflowRepository = new WorkflowRepository(context.workspaceState);
   const providerRegistry = new ProviderRegistry();
@@ -156,6 +164,7 @@ export function createServiceContainer(context: vscode.ExtensionContext): Servic
       collections: snapshot.collections,
       activePrompt: snapshot.prompts.find(prompt => prompt.id === activePromptId) ?? snapshot.prompts[0],
       providers: providerRegistry.list(),
+      skills: skillRepository.list(),
       executionHistory: executionHistoryStore.load(),
       workflows,
       workflowHistory: workflowHistoryStore.load(),
@@ -171,6 +180,7 @@ export function createServiceContainer(context: vscode.ExtensionContext): Servic
     contextEngine,
     promptAssembler,
     promptRepository,
+    skillRepository,
     workflowRepository,
     providerRegistry,
     executionEngine,
@@ -195,7 +205,7 @@ export function createServiceContainer(context: vscode.ExtensionContext): Servic
       const assembledPrompt = promptAssembler.assemble(prompt, resolution.items);
       return {
         prompt: assembledPrompt,
-        promptTokens: tokenEstimator.estimate(prompt.body),
+        promptTokens: tokenEstimator.estimate(promptAssembler.assemble(prompt, [])),
         contextTokens: resolution.includedTokens,
         totalTokens: tokenEstimator.estimate(assembledPrompt),
         contextBudgetTokens: resolution.budgetTokens,

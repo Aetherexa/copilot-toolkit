@@ -9,6 +9,7 @@ export interface PromptDefinition {
   category: string;
   tags: string[];
   body: string;
+  skillIds?: string[];
   favorite?: boolean;
   context: ContextBinding[];
   contextBudgetTokens?: number;

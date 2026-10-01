@@ -79,7 +79,7 @@ export class ExecutionEngine {
   async preparePrompt(prompt: PromptDefinition, extraContext: ResolvedContext[] = []): Promise<PreparedPromptExecution> {
     await this.beforeContextResolve?.(prompt);
     const requestedContextBudget = prompt.contextBudgetTokens ?? 1800;
-    const promptTokens = this.tokenEstimator.estimate(prompt.body);
+    const promptTokens = this.tokenEstimator.estimate(this.promptAssembler.assemble(prompt, []));
     const providerId = prompt.providerId ?? 'github-copilot';
     const model = this.providerRegistry.getModel(providerId, prompt.modelId);
     const effectiveContextBudget = model?.maxInputTokens
@@ -188,7 +188,7 @@ export class ExecutionEngine {
       const editor = this.getEditorSnapshot();
       await recordExecution(this.context.globalState, {
         mode: 'single',
-        skillNames: prompt.tags.length > 0 ? prompt.tags : ['studio'],
+        skillNames: (prompt.skillIds?.length ?? 0) > 0 ? prompt.skillIds! : ['studio'],
         promptLabel: prompt.name,
         languageId: editor.languageId,
         fileName: editor.fileName,

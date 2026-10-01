@@ -1,8 +1,9 @@
 import { ChangeEvent } from 'react';
-import { PromptDefinition } from '../types';
+import { PromptDefinition, SkillSummary } from '../types';
 
 interface PromptEditorProps {
   prompt: PromptDefinition;
+  skills: SkillSummary[];
   dirty: boolean;
   onChange: (prompt: PromptDefinition) => void;
 }
@@ -14,7 +15,7 @@ function updateTags(value: string): string[] {
     .filter(Boolean);
 }
 
-export function PromptEditor({ prompt, dirty, onChange }: PromptEditorProps) {
+export function PromptEditor({ prompt, skills, dirty, onChange }: PromptEditorProps) {
   const update = (field: keyof PromptDefinition) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = event.target.value;
     if (field === 'tags') {
@@ -23,6 +24,11 @@ export function PromptEditor({ prompt, dirty, onChange }: PromptEditorProps) {
     }
 
     onChange({ ...prompt, [field]: value } as PromptDefinition);
+  };
+
+  const updateSkills = (event: ChangeEvent<HTMLSelectElement>) => {
+    const skillIds = [...event.target.selectedOptions].map(option => option.value);
+    onChange({ ...prompt, skillIds });
   };
 
   return (
@@ -53,6 +59,29 @@ export function PromptEditor({ prompt, dirty, onChange }: PromptEditorProps) {
       <label className="field">
         <span>Tags</span>
         <input value={prompt.tags.join(', ')} onChange={update('tags')} placeholder="react, review, performance" />
+      </label>
+
+      <label className="field">
+        <span>Skills</span>
+        <select
+          multiple
+          value={prompt.skillIds ?? []}
+          onChange={updateSkills}
+          size={Math.min(Math.max(skills.length, 3), 6)}
+          aria-describedby="prompt-skills-help"
+        >
+          {skills.map(skill => (
+            <option key={skill.id} value={skill.id}>
+              {skill.name}
+            </option>
+          ))}
+        </select>
+        <small id="prompt-skills-help" className="field-help">
+          {skills.length > 0
+            ? 'Select one or more reusable skills from .copilot/skills/. Ctrl/Cmd-click to select multiple skills.'
+            : 'No .copilot/skills/*.md files were found in this workspace.'}
+          {' '}Project instructions from .github/copilot-instructions.md are applied automatically.
+        </small>
       </label>
 
       <label className="field field-editor">
