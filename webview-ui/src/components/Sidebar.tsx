@@ -13,6 +13,7 @@ interface SidebarProps {
   activePromptForCollection?: PromptDefinition | null;
   getCollectionPrompts: (collectionId: string) => PromptDefinition[];
   onSelectPrompt: (prompt: PromptDefinition) => void;
+  onToggleFavorite: (prompt: PromptDefinition) => void;
   onSelectNav: (nav: string) => void;
   onSearchChange: (query: string) => void;
   onCreatePrompt: () => void;
@@ -70,6 +71,7 @@ export function Sidebar({
   activePromptForCollection,
   getCollectionPrompts,
   onSelectPrompt,
+  onToggleFavorite,
   onSelectNav,
   onSearchChange,
   onCreatePrompt,
@@ -204,17 +206,27 @@ export function Sidebar({
               </div>
             )}
             {visiblePrompts.map(prompt => (
-              <button
-                key={prompt.id}
-                type="button"
-                role="listitem"
-                className={`library-item${activePromptId === prompt.id ? ' is-active' : ''}`}
-                onClick={() => onSelectPrompt(prompt)}
-              >
-                <span className="library-item-title">{prompt.favorite ? '★ ' : ''}{prompt.name}</span>
-                <span className="library-item-meta">{prompt.category}</span>
-                <span className="library-item-badge">{prompt.source ?? 'workspace'}</span>
-              </button>
+              <div key={prompt.id} role="listitem" className="prompt-library-item">
+                <button
+                  type="button"
+                  className={`library-item prompt-library-open${activePromptId === prompt.id ? ' is-active' : ''}`}
+                  onClick={() => onSelectPrompt(prompt)}
+                >
+                  <span className="library-item-title">{prompt.name}</span>
+                  <span className="library-item-meta">{prompt.category}</span>
+                  <span className="library-item-badge">{prompt.source ?? 'workspace'}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`prompt-favorite-button${prompt.favorite ? ' is-favorite' : ''}`}
+                  aria-label={prompt.favorite ? `Remove ${prompt.name} from favorites` : `Add ${prompt.name} to favorites`}
+                  aria-pressed={Boolean(prompt.favorite)}
+                  title={prompt.favorite ? 'Remove from favorites' : 'Add to favorites'}
+                  onClick={() => onToggleFavorite(prompt)}
+                >
+                  {prompt.favorite ? '★' : '☆'}
+                </button>
+              </div>
             ))}
           </div>
         </div>
