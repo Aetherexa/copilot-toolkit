@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -7,7 +7,7 @@ import { PromptDefinition } from '../domain/prompt';
 import { PromptAssembler } from '../prompts/PromptAssembler';
 import { SkillRepository } from '../skills/SkillRepository';
 
-function createWorkspace(t: Parameters<typeof test>[1] extends (context: infer C) => unknown ? C : never): {
+function createWorkspace(t: TestContext): {
   root: string;
   skillsFolder: string;
   instructionsFile: string;
