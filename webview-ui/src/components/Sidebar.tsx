@@ -38,7 +38,6 @@ const navItems = [
   'Collections',
   'Workflows',
   'Providers',
-  'Context Builder',
   'Analytics',
   'Settings',
 ];
@@ -88,7 +87,7 @@ export function Sidebar({
   onRemovePromptFromCollection,
 }: SidebarProps) {
   const promptLibraryNav = ['All Prompts', 'Favorites', 'My Prompts'];
-  const utilityNav = ['Providers', 'Context Builder', 'Analytics', 'Settings'];
+  const utilityNav = ['Providers', 'Analytics', 'Settings'];
   const showCreateTools = activeNav === 'Workflows' || promptLibraryNav.includes(activeNav) || activeNav === 'Collections';
   const showSearch = activeNav === 'Workflows' || activeNav === 'Built-in Actions' || promptLibraryNav.includes(activeNav);
 
@@ -192,9 +191,15 @@ export function Sidebar({
             })}
           </div>
         </div>
-      ) : activeNav === 'Built-in Actions' ? (
+      ) : ['All Prompts', 'My Prompts', 'Built-in Actions'].includes(activeNav) ? (
         <div className="sidebar-section sidebar-library">
-          <div className="library-empty">Built-in actions are grouped by category in the main workspace.</div>
+          <div className="library-empty">
+            {activeNav === 'Built-in Actions'
+              ? 'Built-in actions are grouped by category in the main workspace.'
+              : activeNav === 'My Prompts'
+                ? 'Your prompts are grouped by category in the main workspace.'
+                : 'All prompts are grouped by category in the main workspace.'}
+          </div>
         </div>
       ) : utilityNav.includes(activeNav) ? null : (
         <div className="sidebar-section sidebar-library">
