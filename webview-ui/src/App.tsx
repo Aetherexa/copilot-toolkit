@@ -206,7 +206,9 @@ export default function App() {
   const [graphView, setGraphView] = useState<GraphView | null>(null);
   const [executionHistory, setExecutionHistory] = useState<PromptExecutionRecord[]>([]);
   const [unsupportedContextTypes, setUnsupportedContextTypes] = useState<string[]>([]);
-  const [activeNav, setActiveNav] = useState(defaultState?.activeNav ?? 'Prompt Studio');
+  const [activeNav, setActiveNav] = useState(
+    defaultState?.activeNav === 'Prompt Studio' ? 'All Prompts' : (defaultState?.activeNav ?? 'All Prompts'),
+  );
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(defaultState?.selectedCollectionId ?? null);
   const [searchQuery, setSearchQuery] = useState(defaultState?.searchQuery ?? '');
   const [activeWorkbenchTab, setActiveWorkbenchTab] = useState<'preview' | 'output' | 'history' | 'map'>(defaultState?.activeWorkbenchTab ?? 'preview');
@@ -572,6 +574,11 @@ export default function App() {
     setPreview(null);
     setError('');
     setMessage('');
+  }
+
+  function openPromptFromCatalog(prompt: PromptDefinition): void {
+    openPromptInTab(prompt);
+    setActiveNav('All Prompts');
   }
 
   function updateActivePrompt(nextPrompt: PromptDefinition): void {
@@ -990,9 +997,24 @@ export default function App() {
   }
 
   function handleSelectNav(nav: string): void {
+    if (
+      nav === 'Workflows'
+      && workflowDraft
+      && isWorkflowDirty(workflowDraft, workflowSaved)
+      && !window.confirm(`Discard unsaved changes to ${workflowDraft.name} and return to the workflow catalog?`)
+    ) {
+      return;
+    }
+
     setActiveNav(nav);
-    if (nav === 'Workflows' && !workflowDraft && workflows[0]) {
-      selectWorkflow(workflows[0], false);
+    setError('');
+    setMessage('');
+    if (nav === 'Workflows') {
+      setSelectedWorkflowId(null);
+      setWorkflowDraft(null);
+      setWorkflowSaved(null);
+      setStreamingStepOutputs({});
+      setWorkflowView('run');
     }
   }
 
@@ -1107,6 +1129,35 @@ export default function App() {
     setSelectedWorkflowExecutionId(null);
   }
 
+  const builtInGroups = useMemo(() => {
+    const groups = new Map<string, PromptDefinition[]>();
+    for (const prompt of visiblePrompts.filter(item => item.source === 'builtin')) {
+      const category = prompt.category.trim() || 'Other';
+      const items = groups.get(category) ?? [];
+      items.push(prompt);
+      groups.set(category, items);
+    }
+    return [...groups.entries()]
+      .map(([category, items]) => [category, [...items].sort((left, right) => left.name.localeCompare(right.name))] as const)
+      .sort(([left], [right]) => left.localeCompare(right));
+  }, [visiblePrompts]);
+
+  const visibleWorkflows = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return workflows.filter(workflow =>
+      !query
+      || workflow.name.toLowerCase().includes(query)
+      || (workflow.description ?? '').toLowerCase().includes(query),
+    );
+  }, [workflows, searchQuery]);
+
+  const promptEditorNav = ['All Prompts', 'Favorites', 'My Prompts', 'Collections'].includes(activeNav);
+  const showRightContextBuilder = promptEditorNav && Boolean(activePrompt);
+  const successfulExecutions = executionHistory.filter(item => item.status === 'success').length;
+  const totalEstimatedInputTokens = executionHistory.reduce((sum, item) => sum + (item.usage.estimatedInputTokens ?? item.usage.actualInputTokens ?? 0), 0);
+  const totalOutputTokens = executionHistory.reduce((sum, item) => sum + (item.usage.outputTokens ?? 0), 0);
+  const completedWorkflows = workflowHistory.filter(item => item.status === 'success').length;
+
   const tabItems = tabs.map(tab => ({ id: tab.id, title: tab.prompt.name || 'Untitled Prompt', dirty: isTabDirty(tab) }));
 
   return (
@@ -1120,13 +1171,17 @@ export default function App() {
           {activeNav === 'Workflows' ? (
             <>
               <button type="button" className="button-secondary" onClick={createWorkflow}>New Workflow</button>
-              <button type="button" className="button-secondary" onClick={saveWorkflow} disabled={!activeWorkflow || isSaving}>{isSaving ? 'Saving...' : 'Save Workflow'}</button>
-              <button type="button" className="button-secondary" onClick={duplicateWorkflow} disabled={!activeWorkflow}>Duplicate</button>
-              <button type="button" className="button-secondary" onClick={exportWorkflow} disabled={!activeWorkflow}>Export</button>
-              <button type="button" className="button-secondary danger-text" onClick={deleteWorkflow} disabled={!activeWorkflow || activeWorkflow.source === 'builtin'} title={activeWorkflow?.source === 'builtin' ? 'Duplicate built-in workflows before deleting' : undefined}>Delete</button>
-              <button type="button" className="button-primary" onClick={runWorkflow} disabled={!activeWorkflow || Boolean(runningWorkflowExecutionId)}>{runningWorkflowExecutionId ? 'Running...' : 'Run Workflow'}</button>
+              {activeWorkflow && (
+                <>
+                  <button type="button" className="button-secondary" onClick={saveWorkflow} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save Workflow'}</button>
+                  <button type="button" className="button-secondary" onClick={duplicateWorkflow}>Duplicate</button>
+                  <button type="button" className="button-secondary" onClick={exportWorkflow}>Export</button>
+                  <button type="button" className="button-secondary danger-text" onClick={deleteWorkflow} disabled={activeWorkflow.source === 'builtin'} title={activeWorkflow.source === 'builtin' ? 'Duplicate built-in workflows before deleting' : undefined}>Delete</button>
+                  <button type="button" className="button-primary" onClick={runWorkflow} disabled={Boolean(runningWorkflowExecutionId)}>{runningWorkflowExecutionId ? 'Running...' : 'Run Workflow'}</button>
+                </>
+              )}
             </>
-          ) : (
+          ) : promptEditorNav ? (
             <>
               <button type="button" className="button-secondary" onClick={handleCreatePrompt}>New</button>
               <button type="button" className="button-secondary" onClick={() => void handleSave()} disabled={!activePrompt || isSaving}>{isSaving ? 'Saving...' : 'Save'}</button>
@@ -1137,11 +1192,15 @@ export default function App() {
               <button type="button" className="button-secondary danger-text" onClick={handleDeletePrompt} disabled={!activePrompt}>Delete</button>
               <button type="button" className="button-primary" onClick={runPrompt} disabled={!activePrompt || isRunning}>{isRunning ? 'Running...' : 'Run Prompt'}</button>
             </>
-          )}
+          ) : activeNav === 'Built-in Actions' ? (
+            <button type="button" className="button-secondary" onClick={handleCreatePrompt}>New Custom Prompt</button>
+          ) : activeNav === 'Providers' ? (
+            <button type="button" className="button-secondary" onClick={refreshProviders} disabled={isRefreshingProviders}>{isRefreshingProviders ? 'Refreshing...' : 'Refresh Providers'}</button>
+          ) : null}
         </div>
       </header>
 
-      <div className="studio-grid">
+      <div className={`studio-grid${showRightContextBuilder ? '' : ' studio-grid-wide'}`}>
         <Sidebar
           prompts={prompts}
           visiblePrompts={visiblePrompts}
@@ -1172,9 +1231,42 @@ export default function App() {
         />
 
         <main className="studio-main">
-          {activeNav === 'Workflows' ? (
-            <>
-              {activeWorkflow ? (
+          {activeNav === 'Built-in Actions' ? (
+            <section className="catalog-panel">
+              <div className="catalog-header">
+                <div>
+                  <h1>Built-in Actions</h1>
+                  <p>Framework-neutral developer actions grouped by category. Select an action to open it in Prompt Studio.</p>
+                </div>
+                <span className="catalog-count">{visiblePrompts.filter(item => item.source === 'builtin').length} actions</span>
+              </div>
+              {builtInGroups.length === 0 ? (
+                <div className="library-empty">No built-in actions match the current search.</div>
+              ) : (
+                <div className="catalog-sections">
+                  {builtInGroups.map(([category, items]) => (
+                    <details key={category} className="catalog-group" open>
+                      <summary><span>{category}</span><span>{items.length}</span></summary>
+                      <div className="catalog-grid">
+                        {items.map(prompt => (
+                          <button key={prompt.id} type="button" className="catalog-card" onClick={() => openPromptFromCatalog(prompt)}>
+                            <span className="catalog-card-title">{prompt.name}</span>
+                            <span className="catalog-card-description">{prompt.description || 'Open this action in Prompt Studio.'}</span>
+                            <span className="catalog-card-meta">
+                              {prompt.tags.slice(0, 3).map(tag => <em key={tag}>{tag}</em>)}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : activeNav === 'Workflows' ? (
+            activeWorkflow ? (
+              <>
+                <button type="button" className="back-link" onClick={() => handleSelectNav('Workflows')}>← Back to workflow catalog</button>
                 <WorkflowBuilder
                   workflow={activeWorkflow}
                   prompts={prompts}
@@ -1185,129 +1277,219 @@ export default function App() {
                   onAddStep={addWorkflowStep}
                   onMoveStep={moveWorkflowStep}
                 />
-              ) : (
-                <section className="editor-panel empty-panel">
-                  <h1>No workflow selected</h1>
-                  <p>Create or select a workflow to continue.</p>
+                <section className="workbench-panel">
+                  <div className="workbench-tabs" role="tablist" aria-label="Workflow execution tabs">
+                    <button type="button" className={`workbench-tab${workflowView === 'run' ? ' is-active' : ''}`} onClick={() => setWorkflowView('run')}>Run Output</button>
+                    <button type="button" className={`workbench-tab${workflowView === 'history' ? ' is-active' : ''}`} onClick={() => setWorkflowView('history')}>History</button>
+                  </div>
+                  {workflowView === 'run' ? (
+                    <WorkflowRunPanel record={runningWorkflowExecutionId ? null : selectedWorkflowExecution} runningExecutionId={runningWorkflowExecutionId} streamingStepOutputs={streamingStepOutputs} onCancel={cancelWorkflow} />
+                  ) : (
+                    <WorkflowHistoryPanel history={workflowHistory} selectedExecutionId={selectedWorkflowExecutionId} onSelect={selectWorkflowExecution} onDelete={deleteWorkflowExecution} onClear={clearWorkflowHistory} />
+                  )}
+                </section>
+              </>
+            ) : (
+              <section className="catalog-panel">
+                <div className="catalog-header">
+                  <div>
+                    <h1>Workflows</h1>
+                    <p>Choose a reusable workflow or create one for your own engineering process.</p>
+                  </div>
+                  <span className="catalog-count">{visibleWorkflows.length} workflows</span>
+                </div>
+                <div className="catalog-grid workflow-catalog-grid">
+                  {visibleWorkflows.map(workflow => (
+                    <button key={workflow.id} type="button" className="catalog-card workflow-catalog-card" onClick={() => selectWorkflow(workflow)}>
+                      <span className="catalog-card-title">{workflow.name}</span>
+                      <span className="catalog-card-description">{workflow.description || 'Open workflow builder.'}</span>
+                      <span className="catalog-card-meta">
+                        <em>{workflow.steps.length} steps</em>
+                        <em>{workflow.source ?? 'workspace'}</em>
+                      </span>
+                    </button>
+                  ))}
+                  {visibleWorkflows.length === 0 && <div className="library-empty">No workflows match the current search.</div>}
+                </div>
+              </section>
+            )
+          ) : activeNav === 'Providers' ? (
+            <section className="editor-panel">
+              <div className="editor-header">
+                <div>
+                  <h1>Providers</h1>
+                  <p>Available AI providers and models detected by Copilot Toolkit.</p>
+                </div>
+              </div>
+              <div className="provider-grid provider-overview-grid">
+                {providers.map(provider => (
+                  <article key={provider.id} className="provider-card provider-overview-card">
+                    <strong>{provider.displayName ?? provider.name}</strong>
+                    <span>{provider.description ?? 'AI provider'}</span>
+                    <span>Status: {provider.status ?? (provider.enabled ? 'available' : 'unavailable')}</span>
+                    <span>{provider.models.length} model{provider.models.length === 1 ? '' : 's'}</span>
+                    <div className="provider-model-list">
+                      {provider.models.map(model => <em key={model.id}>{model.name}</em>)}
+                    </div>
+                  </article>
+                ))}
+                {providers.length === 0 && <div className="library-empty">No providers are currently available.</div>}
+              </div>
+            </section>
+          ) : activeNav === 'Context Builder' ? (
+            activePrompt ? (
+              <ContextBuilder
+                context={activePrompt.context}
+                unsupportedContextTypes={unsupportedContextTypes}
+                contextBudgetTokens={activePrompt.contextBudgetTokens ?? 1800}
+                suggestions={suggestedContextTypes}
+                onToggle={toggleContext}
+                onUpdateOptions={updateContextOptions}
+                onBudgetChange={updateContextBudget}
+                onApplySuggestion={applySuggestion}
+                onPickFiles={pickSelectedFiles}
+                onRemoveSelectedFile={removeSelectedFile}
+                onPreview={previewContext}
+                previewBusy={isPreviewing}
+              />
+            ) : (
+              <section className="editor-panel empty-panel empty-panel-top">
+                <h1>Context Builder</h1>
+                <p>Open a prompt first, then choose current files, selected files, Git context, tests, architecture, and token limits here.</p>
+                <button type="button" className="button-primary empty-state-action" onClick={handleCreatePrompt}>Create Prompt</button>
+              </section>
+            )
+          ) : activeNav === 'Analytics' ? (
+            <section className="editor-panel">
+              <div className="editor-header">
+                <div>
+                  <h1>Analytics</h1>
+                  <p>Local execution activity for this workspace.</p>
+                </div>
+              </div>
+              <div className="analytics-grid">
+                <div className="metric-card"><span>Prompt Runs</span><strong>{executionHistory.length}</strong></div>
+                <div className="metric-card"><span>Successful Prompts</span><strong>{successfulExecutions}</strong></div>
+                <div className="metric-card"><span>Workflow Runs</span><strong>{workflowHistory.length}</strong></div>
+                <div className="metric-card"><span>Successful Workflows</span><strong>{completedWorkflows}</strong></div>
+                <div className="metric-card"><span>Estimated Input Tokens</span><strong>{totalEstimatedInputTokens.toLocaleString()}</strong></div>
+                <div className="metric-card"><span>Output Tokens</span><strong>{totalOutputTokens.toLocaleString()}</strong></div>
+                <div className="metric-card"><span>Indexed Files</span><strong>{indexingStatus?.filesIndexed ?? 0}</strong></div>
+                <div className="metric-card"><span>Graph Relationships</span><strong>{indexingStatus?.relationships ?? 0}</strong></div>
+              </div>
+            </section>
+          ) : activeNav === 'Settings' ? (
+            <section className="editor-panel">
+              <div className="editor-header">
+                <div>
+                  <h1>Settings</h1>
+                  <p>Copilot Toolkit settings are managed through VS Code Settings.</p>
+                </div>
+              </div>
+              <div className="settings-list">
+                <div className="settings-card"><strong>Prompt Folder</strong><code>copilotToolkit.promptFolder</code><span>Location for workspace prompt markdown files.</span></div>
+                <div className="settings-card"><strong>Skills Folder</strong><code>copilotToolkit.skillsFolder</code><span>Location for reusable AI skill instructions.</span></div>
+                <div className="settings-card"><strong>Adaptive Learning</strong><code>copilotToolkit.enableLearning</code><span>Controls local recommendation learning.</span></div>
+                <div className="settings-card"><strong>History Content</strong><code>copilotToolkit.history.storeContent</code><span>Controls whether full prompt/context and response text is retained locally.</span></div>
+              </div>
+              <p className="settings-hint">Open VS Code Settings and search for “Copilot Toolkit” to change these values.</p>
+            </section>
+          ) : (
+            <>
+              <PromptTabs tabs={tabItems} activeTabId={activeTabId} onSelectTab={focusTab} onCloseTab={closeTab} />
+
+              {!activePrompt && (
+                <section className="editor-panel empty-panel empty-panel-top">
+                  <h1>No prompt tab open</h1>
+                  <p>Create a prompt or open one from the library to continue.</p>
+                  <button type="button" className="button-primary empty-state-action" onClick={handleCreatePrompt}>Create Prompt</button>
                 </section>
               )}
 
-              <section className="workbench-panel">
-                <div className="workbench-tabs" role="tablist" aria-label="Workflow execution tabs">
-                  <button type="button" className={`workbench-tab${workflowView === 'run' ? ' is-active' : ''}`} onClick={() => setWorkflowView('run')}>Run Output</button>
-                  <button type="button" className={`workbench-tab${workflowView === 'history' ? ' is-active' : ''}`} onClick={() => setWorkflowView('history')}>History</button>
-                </div>
-                {workflowView === 'run' ? (
-                  <WorkflowRunPanel record={runningWorkflowExecutionId ? null : selectedWorkflowExecution} runningExecutionId={runningWorkflowExecutionId} streamingStepOutputs={streamingStepOutputs} onCancel={cancelWorkflow} />
-                ) : (
-                  <WorkflowHistoryPanel history={workflowHistory} selectedExecutionId={selectedWorkflowExecutionId} onSelect={selectWorkflowExecution} onDelete={deleteWorkflowExecution} onClear={clearWorkflowHistory} />
-                )}
-              </section>
-            </>
-          ) : (
-            <>
-          <PromptTabs tabs={tabItems} activeTabId={activeTabId} onSelectTab={focusTab} onCloseTab={closeTab} />
+              {activePrompt && (
+                <>
+                  <PromptEditor prompt={activePrompt} dirty={activeDirty} onChange={updateActivePrompt} />
 
-          {!activePrompt && (
-            <section className="editor-panel empty-panel">
-              <h1>No prompt tab open</h1>
-              <p>Create a prompt or open one from the library to continue.</p>
-            </section>
-          )}
-
-          {activePrompt && (
-            <>
-              <PromptEditor prompt={activePrompt} dirty={activeDirty} onChange={updateActivePrompt} />
-
-              <div className="chip-row">
-                {enabledContext.map(binding => (
-                  <ContextChip
-                    key={binding.type}
-                    binding={binding}
-                    resolved={resolvedByType.get(binding.type)}
-                    onRemove={removeContext}
-                  />
-                ))}
-              </div>
-
-              <ProviderSelector
-                providers={providers}
-                providerId={activePrompt.providerId}
-                modelId={activePrompt.modelId}
-                onSelect={selectProvider}
-                onRefresh={refreshProviders}
-                busy={isRefreshingProviders}
-              />
-
-              <div className="bottom-panels">
-                <section className="workbench-panel">
-                  <div className="workbench-tabs" role="tablist" aria-label="Execution workbench tabs">
-                    <button type="button" className={`workbench-tab${activeWorkbenchTab === 'preview' ? ' is-active' : ''}`} onClick={() => setActiveWorkbenchTab('preview')}>Preview</button>
-                    <button type="button" className={`workbench-tab${activeWorkbenchTab === 'output' ? ' is-active' : ''}`} onClick={() => setActiveWorkbenchTab('output')}>Output</button>
-                    <button type="button" className={`workbench-tab${activeWorkbenchTab === 'history' ? ' is-active' : ''}`} onClick={() => setActiveWorkbenchTab('history')}>History</button>
-                    <button type="button" className={`workbench-tab${activeWorkbenchTab === 'map' ? ' is-active' : ''}`} onClick={() => { setActiveWorkbenchTab('map'); refreshMap(); }}>Map</button>
+                  <div className="chip-row">
+                    {enabledContext.map(binding => (
+                      <ContextChip
+                        key={binding.type}
+                        binding={binding}
+                        resolved={resolvedByType.get(binding.type)}
+                        onRemove={removeContext}
+                      />
+                    ))}
                   </div>
 
-                  {activeWorkbenchTab === 'preview' && (
-                    <PromptPreview preview={preview} runningMessage={message} providerName={activeProvider?.displayName ?? activeProvider?.name} modelName={activeModel?.name} />
-                  )}
-                  {activeWorkbenchTab === 'output' && (
-                    <OutputPanel
-                      execution={executionHistory.find(item => item.id === currentExecutionId) ?? selectedExecution}
-                      responseText={currentOutput || selectedExecution?.responseText || ''}
-                      running={isRunning}
-                      onCopy={() => void copyResponse()}
-                      onClear={clearOutput}
-                      onCancel={cancelExecution}
+                  <ProviderSelector
+                    providers={providers}
+                    providerId={activePrompt.providerId}
+                    modelId={activePrompt.modelId}
+                    onSelect={selectProvider}
+                    onRefresh={refreshProviders}
+                    busy={isRefreshingProviders}
+                  />
+
+                  <div className="bottom-panels">
+                    <section className="workbench-panel">
+                      <div className="workbench-tabs" role="tablist" aria-label="Execution workbench tabs">
+                        <button type="button" className={`workbench-tab${activeWorkbenchTab === 'preview' ? ' is-active' : ''}`} onClick={() => setActiveWorkbenchTab('preview')}>Preview</button>
+                        <button type="button" className={`workbench-tab${activeWorkbenchTab === 'output' ? ' is-active' : ''}`} onClick={() => setActiveWorkbenchTab('output')}>Output</button>
+                        <button type="button" className={`workbench-tab${activeWorkbenchTab === 'history' ? ' is-active' : ''}`} onClick={() => setActiveWorkbenchTab('history')}>History</button>
+                        <button type="button" className={`workbench-tab${activeWorkbenchTab === 'map' ? ' is-active' : ''}`} onClick={() => { setActiveWorkbenchTab('map'); refreshMap(); }}>Map</button>
+                      </div>
+
+                      {activeWorkbenchTab === 'preview' && (
+                        <PromptPreview preview={preview} runningMessage={message} providerName={activeProvider?.displayName ?? activeProvider?.name} modelName={activeModel?.name} />
+                      )}
+                      {activeWorkbenchTab === 'output' && (
+                        <OutputPanel
+                          execution={executionHistory.find(item => item.id === currentExecutionId) ?? selectedExecution}
+                          responseText={currentOutput || selectedExecution?.responseText || ''}
+                          running={isRunning}
+                          onCopy={() => void copyResponse()}
+                          onClear={clearOutput}
+                          onCancel={cancelExecution}
+                        />
+                      )}
+                      {activeWorkbenchTab === 'history' && (
+                        <HistoryPanel
+                          history={executionHistory}
+                          selectedExecutionId={selectedExecutionId}
+                          onSelect={selectExecution}
+                          onDelete={deleteExecution}
+                          onClear={clearExecutionHistory}
+                        />
+                      )}
+                      {activeWorkbenchTab === 'map' && (
+                        <MapPanel
+                          graph={graphView}
+                          status={indexingStatus}
+                          reverse={mapReverse}
+                          depth={mapDepth}
+                          search={mapSearch}
+                          onDepthChange={depth => setMapDepth(Math.max(1, Math.min(4, depth)))}
+                          onReverseChange={setMapReverse}
+                          onSearchChange={setMapSearch}
+                          onRefresh={refreshMap}
+                          onOpenNode={openGraphNode}
+                        />
+                      )}
+                    </section>
+                    <TokenSummary
+                      totalTokens={preview?.totalTokens ?? 0}
+                      contextItems={preview?.resolvedContext.length ?? enabledContext.length}
+                      provider={activeProvider?.name ?? 'GitHub Copilot'}
+                      model={activeModel?.name ?? 'Default'}
                     />
-                  )}
-                  {activeWorkbenchTab === 'history' && (
-                    <HistoryPanel
-                      history={executionHistory}
-                      selectedExecutionId={selectedExecutionId}
-                      onSelect={selectExecution}
-                      onDelete={deleteExecution}
-                      onClear={clearExecutionHistory}
-                    />
-                  )}
-                  {activeWorkbenchTab === 'map' && (
-                    <MapPanel
-                      graph={graphView}
-                      status={indexingStatus}
-                      reverse={mapReverse}
-                      depth={mapDepth}
-                      search={mapSearch}
-                      onDepthChange={depth => setMapDepth(Math.max(1, Math.min(4, depth)))}
-                      onReverseChange={setMapReverse}
-                      onSearchChange={setMapSearch}
-                      onRefresh={refreshMap}
-                      onOpenNode={openGraphNode}
-                    />
-                  )}
-                </section>
-                <TokenSummary
-                  totalTokens={preview?.totalTokens ?? 0}
-                  contextItems={preview?.resolvedContext.length ?? enabledContext.length}
-                  provider={activeProvider?.name ?? 'GitHub Copilot'}
-                  model={activeModel?.name ?? 'Default'}
-                />
-              </div>
-            </>
-          )}
+                  </div>
+                </>
+              )}
             </>
           )}
         </main>
 
-        {activeNav === 'Workflows' ? (
-          <aside className="context-builder context-builder-empty">
-            <div className="context-builder-header">
-              <div>
-                <h2>Workflow Context</h2>
-                <p>Each step inherits its prompt context unless it defines step-specific context bindings.</p>
-              </div>
-            </div>
-          </aside>
-        ) : activePrompt ? (
+        {showRightContextBuilder && activePrompt && (
           <ContextBuilder
             context={activePrompt.context}
             unsupportedContextTypes={unsupportedContextTypes}
@@ -1322,15 +1504,6 @@ export default function App() {
             onPreview={previewContext}
             previewBusy={isPreviewing}
           />
-        ) : (
-          <aside className="context-builder context-builder-empty">
-            <div className="context-builder-header">
-              <div>
-                <h2>Context Builder</h2>
-                <p>Open a prompt tab to configure request context.</p>
-              </div>
-            </div>
-          </aside>
         )}
       </div>
 
