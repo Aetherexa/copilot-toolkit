@@ -64,6 +64,38 @@ The Studio provides:
 - workflow creation and execution
 - bounded workspace dependency maps
 
+## Built-in developer actions
+
+The Studio ships with a framework-neutral action catalog for common engineering work. Examples include:
+
+- Explain Code, Code Review, Debug Root Cause, Fix Plan
+- Refactor Plan, Simplify Code, Change Impact Analysis
+- Generate Tests, Test Gap Analysis, Edge Case Finder
+- Security Review, Lightweight Threat Model
+- Performance Review, Async & Concurrency Review
+- Error Handling, Observability, and Data Validation reviews
+- Architecture Review, API Contract Review, Backward Compatibility Review
+- Dependency Upgrade Plan, Documentation Writer, PR Description, Release Risk Review
+
+Built-in actions are read-only templates in the prompt library; use **Save As** to customize them. The legacy React review action remains available for backward compatibility, while the default catalog is intentionally language- and framework-agnostic.
+
+## Built-in workflows
+
+Reusable workflows combine those actions into common end-to-end developer jobs:
+
+- PR Readiness
+- Debug to Fix
+- Safe Refactor
+- Test Hardening
+- Security Hardening
+- Performance Investigation
+- API Change Safety
+- Dependency Upgrade
+- Codebase Onboarding
+- Production Readiness
+
+Built-in workflows are protected from deletion. Duplicate one to create a fully independent workspace workflow.
+
 ## Context intelligence
 
 Available context sources include:
