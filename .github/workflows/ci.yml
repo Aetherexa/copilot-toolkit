@@ -148,6 +148,7 @@ jobs:
           echo "::notice::Using CI-based SonarQube Cloud analysis. Automatic Analysis must be disabled for this project in SonarQube Cloud (Administration > Analysis Method)."
 
       - name: SonarQube Cloud scan
+        id: sonar-scan
         if: steps.sonar-config.outputs.enabled == 'true'
         uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8.2.2
         env:
@@ -158,6 +159,23 @@ jobs:
             -Dsonar.organization=${{ env.SONAR_ORGANIZATION }}
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
+
+      - name: Publish SonarQube summary
+        if: always() && steps.sonar-config.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          dashboard="https://sonarcloud.io/summary/new_code?id=${SONAR_PROJECT_KEY}"
+          {
+            echo "## SonarQube Cloud"
+            echo
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+            echo "| Project | `${SONAR_PROJECT_KEY}` |"
+            echo "| Quality Gate step | `${{ steps.sonar-scan.outcome }}` |"
+            echo "| Dashboard | [Open live Sonar results](${dashboard}) |"
+            echo
+            echo "README badges expose the latest main-branch Quality Gate, coverage, bugs, vulnerabilities, code smells, and duplication metrics."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   package:
     name: Package VSIX
