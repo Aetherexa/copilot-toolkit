@@ -16,7 +16,8 @@ Version 2 introduces a Postman-style **AI Workflow Studio** that combines prompt
 
 ## Highlights
 
-- **Prompt Studio** — create, edit, duplicate, favorite, organize, import, and export reusable prompts.
+- **Prompt Studio** — browse prompts as grouped cards, then create, edit, duplicate, favorite, organize, import, and export reusable prompts.
+- **Reusable Skills** — attach one or more `.copilot/skills/*.md` instruction sets to a prompt; project-wide `.github/copilot-instructions.md` is applied automatically.
 - **Context Builder** — attach the current file, selection, Git diff, related files, tests, architecture summary, dependency graph, workspace summary, and more.
 - **Token budgeting** — rank, deduplicate, trim, and exclude lower-value context before execution.
 - **Workspace intelligence** — build a bounded, language-agnostic code graph and query dependencies, reverse dependencies, impact, and architecture relationships.
@@ -217,7 +218,7 @@ your-project/
         └── accessibility.md
 ```
 
-Legacy Markdown prompts are loaded into the Studio without being silently deleted or overwritten.
+Legacy Markdown prompts are loaded into the Studio without being silently deleted or overwritten. Studio also discovers Markdown skills from `.copilot/skills/`; selected skills are stored with the prompt and injected into the assembled request before the task. Project instructions from `.github/copilot-instructions.md` remain workspace-wide and are included automatically.
 
 ## Requirements
 
