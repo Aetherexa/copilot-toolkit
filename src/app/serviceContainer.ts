@@ -26,6 +26,7 @@ import { Workflow } from '../domain/workflow';
 import { PromptRepository } from '../prompts/PromptRepository';
 import { PromptAssembler } from '../prompts/PromptAssembler';
 import { SkillRepository } from '../skills/SkillRepository';
+import { getConfigPath, getWorkspaceRoot } from './workspace';
 import { CopilotChatProvider } from '../providers/CopilotChatProvider';
 import { ProviderRegistry } from '../providers/ProviderRegistry';
 import { RegisteredProvider } from '../providers/RegisteredProvider';
@@ -118,7 +119,11 @@ export function createServiceContainer(context: vscode.ExtensionContext): Servic
   contextRegistry.register(new CurrentFeatureResolver(graphQuery, tokenEstimator));
 
   const contextEngine = new ContextEngine(contextRegistry, contextRanker, tokenEstimator);
-  const skillRepository = new SkillRepository();
+  const skillRepository = new SkillRepository(() => ({
+    workspaceRoot: getWorkspaceRoot(),
+    skillsFolder: getConfigPath('skillsFolder'),
+    projectInstructionsFile: getConfigPath('skillFile'),
+  }));
   const promptAssembler = new PromptAssembler(skillRepository);
   const promptRepository = new PromptRepository(context.workspaceState);
   const workflowRepository = new WorkflowRepository(context.workspaceState);
