@@ -10,6 +10,7 @@ import {
   PromptRepositorySnapshot,
 } from '../domain/prompt';
 import { getConfigPath } from '../app/workspace';
+import { getBuiltInPrompts } from './BuiltInPrompts';
 
 const PROMPTS_KEY = 'copilotToolkit.studioPrompts';
 const COLLECTIONS_KEY = 'copilotToolkit.promptCollections';
@@ -77,37 +78,8 @@ function normalizeCollection(collection: PromptCollection): PromptCollection {
 }
 
 export function createSeedPrompt(): PromptDefinition {
-  const now = timestamp();
-  return {
-    id: 'studio-react-pr-review',
-    name: 'React PR Review',
-    description: 'Review React code for correctness, maintainability, performance and security issues.',
-    category: 'Code Review',
-    tags: ['react', 'review', 'quality'],
-    body: [
-      'You are an expert software engineer.',
-      '',
-      'Review the provided code and context carefully.',
-      '',
-      'Focus on:',
-      '- potential bugs',
-      '- maintainability',
-      '- performance',
-      '- security',
-      '- testing gaps',
-      '- architectural concerns',
-      '',
-      'Provide concise, actionable recommendations and explain the reasoning behind important findings.',
-    ].join('\n'),
-    favorite: true,
-    context: defaultContextBindings(),
-    contextBudgetTokens: 1800,
-    providerId: 'github-copilot',
-    modelId: 'copilot-default',
-    source: 'builtin',
-    createdAt: now,
-    updatedAt: now,
-  };
+  const prompts = getBuiltInPrompts();
+  return prompts.find(prompt => prompt.id === 'studio-react-pr-review') ?? prompts[0];
 }
 
 function toImportedPrompt(filePath: string, body: string): PromptDefinition {
@@ -165,7 +137,7 @@ export class PromptRepository {
     const imported = this.loadImportedPrompts();
     const merged = new Map<string, PromptDefinition>();
 
-    for (const prompt of [...stored.prompts, ...imported]) {
+    for (const prompt of [...getBuiltInPrompts(), ...stored.prompts, ...imported]) {
       if (!merged.has(prompt.id)) {
         merged.set(prompt.id, prompt);
       }
@@ -473,9 +445,10 @@ export class PromptRepository {
   private loadStoredState(): StoredPromptState {
     const persistedPrompts = this.state.get<PromptDefinition[]>(PROMPTS_KEY, []);
     const persistedCollections = this.state.get<PromptCollection[]>(COLLECTIONS_KEY, []);
-    const prompts = persistedPrompts.length > 0
-      ? persistedPrompts.map(prompt => normalizePrompt({ ...prompt, updatedAt: prompt.updatedAt || prompt.createdAt }))
-      : [createSeedPrompt()];
+    const prompts = persistedPrompts.map(prompt => normalizePrompt({
+      ...prompt,
+      updatedAt: prompt.updatedAt || prompt.createdAt,
+    }));
 
     return {
       prompts,
