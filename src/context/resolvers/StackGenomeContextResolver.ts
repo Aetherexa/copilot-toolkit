@@ -10,6 +10,26 @@ interface StackGenomeApi {
 
 export type StackGenomeApiProvider = () => Promise<StackGenomeApi | undefined>;
 
+const COMPACT_BUDGET_THRESHOLD = 1200;
+const DETAILED_BUDGET_THRESHOLD = 3200;
+const DEFAULT_BUDGET = 1800;
+
+export function selectStackGenomeProfile(binding: ContextBinding): StackGenomeProfile {
+  const requested = binding.options?.stackGenomeProfile ?? 'auto';
+  if (requested !== 'auto') {
+    return requested;
+  }
+
+  const budget = binding.options?.totalBudgetTokens ?? DEFAULT_BUDGET;
+  if (budget <= COMPACT_BUDGET_THRESHOLD) {
+    return 'compact';
+  }
+  if (budget >= DETAILED_BUDGET_THRESHOLD) {
+    return 'detailed';
+  }
+  return 'standard';
+}
+
 export class StackGenomeContextResolver implements ContextResolver {
   readonly type = 'stackGenome' as const;
 
@@ -25,7 +45,8 @@ export class StackGenomeContextResolver implements ContextResolver {
         return undefined;
       }
 
-      const profile = binding.options?.stackGenomeProfile ?? 'standard';
+      const requestedProfile = binding.options?.stackGenomeProfile ?? 'auto';
+      const profile = selectStackGenomeProfile(binding);
       const context = await api.getAIContext(profile);
       if (!context) {
         return undefined;
@@ -49,6 +70,7 @@ export class StackGenomeContextResolver implements ContextResolver {
         source: { label: 'StackGenome · aetherexa.stackgenome' },
         metadata: {
           stackGenomeProfile: profile,
+          stackGenomeProfileMode: requestedProfile === 'auto' ? 'auto' : 'explicit',
           stackGenomeApiVersion: api.apiVersion,
         },
       };

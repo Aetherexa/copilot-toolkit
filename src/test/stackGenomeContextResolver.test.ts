@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { StackGenomeContextResolver } from '../context/resolvers/StackGenomeContextResolver';
+import {
+  selectStackGenomeProfile,
+  StackGenomeContextResolver,
+} from '../context/resolvers/StackGenomeContextResolver';
 import { TokenEstimator } from '../services/TokenEstimator';
 
 test('StackGenomeContextResolver resolves versioned project intelligence', async () => {
@@ -36,11 +39,44 @@ test('StackGenomeContextResolver resolves versioned project intelligence', async
   assert.equal(result?.title, 'StackGenome Project Intelligence');
   assert.match(result?.content ?? '', /Reuse zod for validation/);
   assert.equal(result?.metadata?.stackGenomeProfile, 'compact');
+  assert.equal(result?.metadata?.stackGenomeProfileMode, 'explicit');
   assert.equal(result?.metadata?.stackGenomeApiVersion, '1.0');
   assert.equal((result?.tokenEstimate ?? 0) > 0, true);
 });
 
-test('StackGenomeContextResolver defaults to standard profile', async () => {
+test('StackGenome auto profile uses compact context for tight budgets', () => {
+  assert.equal(selectStackGenomeProfile({
+    type: 'stackGenome',
+    enabled: true,
+    options: { stackGenomeProfile: 'auto', totalBudgetTokens: 900 },
+  }), 'compact');
+});
+
+test('StackGenome auto profile uses standard context for normal budgets', () => {
+  assert.equal(selectStackGenomeProfile({
+    type: 'stackGenome',
+    enabled: true,
+    options: { stackGenomeProfile: 'auto', totalBudgetTokens: 1800 },
+  }), 'standard');
+});
+
+test('StackGenome auto profile uses detailed context for large budgets', () => {
+  assert.equal(selectStackGenomeProfile({
+    type: 'stackGenome',
+    enabled: true,
+    options: { stackGenomeProfile: 'auto', totalBudgetTokens: 4000 },
+  }), 'detailed');
+});
+
+test('explicit StackGenome profile overrides automatic budget selection', () => {
+  assert.equal(selectStackGenomeProfile({
+    type: 'stackGenome',
+    enabled: true,
+    options: { stackGenomeProfile: 'detailed', totalBudgetTokens: 600 },
+  }), 'detailed');
+});
+
+test('StackGenomeContextResolver defaults to automatic standard profile', async () => {
   let selectedProfile: string | undefined;
   const resolver = new StackGenomeContextResolver(
     new TokenEstimator(),
@@ -60,6 +96,7 @@ test('StackGenomeContextResolver defaults to standard profile', async () => {
 
   assert.equal(selectedProfile, 'standard');
   assert.equal(result?.metadata?.stackGenomeProfile, 'standard');
+  assert.equal(result?.metadata?.stackGenomeProfileMode, 'auto');
 });
 
 test('StackGenomeContextResolver gracefully skips a missing provider', async () => {

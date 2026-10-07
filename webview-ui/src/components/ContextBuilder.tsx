@@ -170,11 +170,12 @@ function renderOptions(
           <label className="field compact-field">
             <span>Context Profile</span>
             <select
-              value={binding.options?.stackGenomeProfile ?? 'standard'}
+              value={binding.options?.stackGenomeProfile ?? 'auto'}
               onChange={event => onUpdateOptions(binding.type, {
-                stackGenomeProfile: event.target.value as 'compact' | 'standard' | 'detailed',
+                stackGenomeProfile: event.target.value as 'auto' | 'compact' | 'standard' | 'detailed',
               })}
             >
+              <option value="auto">Auto — adapt to token budget</option>
               <option value="compact">Compact — token efficient</option>
               <option value="standard">Standard — recommended</option>
               <option value="detailed">Detailed — diagnostic</option>
