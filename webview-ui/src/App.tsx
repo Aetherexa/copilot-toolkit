@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { detectSuggestedContextTypes } from '@shared/context/ContextSuggestionEngine';
 import { Sidebar } from './components/Sidebar';
 import { PromptTabs } from './components/PromptTabs';
 import { PromptEditor } from './components/PromptEditor';
@@ -85,31 +86,6 @@ function mergeContextBindings(existing: ContextBinding[], incoming: ContextBindi
     map.set(binding.type, binding);
   }
   return [...map.values()];
-}
-
-function detectSuggestedContextTypes(prompt: PromptDefinition | null): ContextType[] {
-  if (!prompt) {
-    return [];
-  }
-
-  const haystack = `${prompt.name} ${prompt.category} ${prompt.body}`.toLowerCase();
-  if (/review|audit|pr/.test(haystack)) {
-    return ['gitDiff', 'relatedFiles', 'relatedTests'];
-  }
-  if (/debug|bug|fix|error/.test(haystack)) {
-    return ['currentFile', 'currentSelection', 'relatedFiles', 'recentCommits'];
-  }
-  if (/explain|understand|document/.test(haystack)) {
-    return ['currentFile', 'openEditors', 'workspaceSummary'];
-  }
-  if (/test|coverage/.test(haystack)) {
-    return ['relatedTests', 'relatedFiles', 'gitDiff'];
-  }
-  if (/refactor|cleanup|modernize/.test(haystack)) {
-    return ['currentFile', 'relatedFiles', 'openEditors'];
-  }
-
-  return ['currentFile', 'relatedFiles'];
 }
 
 function findSavedPrompt(tab: PromptTabState, prompts: PromptDefinition[]): PromptDefinition | undefined {

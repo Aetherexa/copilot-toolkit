@@ -29,7 +29,13 @@ export class ContextEngine {
         continue;
       }
 
-      const result = await resolver.resolve(binding);
+      const result = await resolver.resolve({
+        ...binding,
+        options: {
+          ...(binding.options ?? {}),
+          totalBudgetTokens: binding.options?.totalBudgetTokens ?? budgetTokens,
+        },
+      });
       if (result) {
         resolved.push(...(Array.isArray(result) ? result : [result]));
       }

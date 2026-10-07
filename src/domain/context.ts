@@ -30,7 +30,7 @@ export interface ContextOptions {
   includeUnstaged?: boolean;
   totalBudgetTokens?: number;
   filePaths?: string[];
-  stackGenomeProfile?: 'compact' | 'standard' | 'detailed';
+  stackGenomeProfile?: 'auto' | 'compact' | 'standard' | 'detailed';
 }
 
 export interface ContextBinding {

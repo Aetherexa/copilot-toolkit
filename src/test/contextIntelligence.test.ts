@@ -329,3 +329,27 @@ test('SelectedFilesResolver returns empty context when no file paths are configu
   assert.deepEqual(result, []);
   assert.equal(workspaceRead, false);
 });
+
+
+test('ContextEngine propagates the total token budget to resolvers', async () => {
+  let observedBudget: number | undefined;
+  const registry = new ContextRegistry();
+  registry.register({
+    type: 'stackGenome',
+    async resolve(binding) {
+      observedBudget = binding.options?.totalBudgetTokens;
+      return {
+        type: 'stackGenome',
+        title: 'StackGenome',
+        content: 'ecosystem',
+        tokenEstimate: 3,
+        truncated: false,
+      };
+    },
+  });
+
+  const engine = new ContextEngine(registry, new ContextRanker(), new TokenEstimator());
+  await engine.resolve([{ type: 'stackGenome', enabled: true }], 900);
+
+  assert.equal(observedBudget, 900);
+});
