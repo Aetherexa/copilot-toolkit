@@ -6,6 +6,7 @@ const DEFAULT_SCORES: Partial<Record<ResolvedContext['type'], number>> = {
   currentFile: 95,
   gitDiff: 90,
   relatedFiles: 80,
+  stackGenome: 78,
   relatedTests: 76,
   openEditors: 74,
   currentFolder: 70,
