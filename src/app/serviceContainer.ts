@@ -17,6 +17,7 @@ import { RecentCommitsResolver } from '../context/resolvers/RecentCommitsResolve
 import { RelatedFilesResolver } from '../context/resolvers/RelatedFilesResolver';
 import { RelatedTestsResolver } from '../context/resolvers/RelatedTestsResolver';
 import { SelectedFilesResolver } from '../context/resolvers/SelectedFilesResolver';
+import { StackGenomeContextResolver } from '../context/resolvers/StackGenomeContextResolver';
 import { WorkspaceSummaryResolver } from '../context/resolvers/WorkspaceSummaryResolver';
 import { ContextBinding, ContextType } from '../domain/context';
 import { PromptExecutionRequest, PromptExecutionResult } from '../domain/execution';
@@ -117,6 +118,24 @@ export function createServiceContainer(context: vscode.ExtensionContext): Servic
   contextRegistry.register(new ArchitectureSummaryResolver(graphQuery, tokenEstimator));
   contextRegistry.register(new DependencyGraphResolver(graphQuery, tokenEstimator));
   contextRegistry.register(new CurrentFeatureResolver(graphQuery, tokenEstimator));
+  contextRegistry.register(new StackGenomeContextResolver(
+    tokenEstimator,
+    async () => {
+      const extension = vscode.extensions.getExtension<{
+        apiVersion: string;
+        getAIContext(profile?: 'compact' | 'standard' | 'detailed'): Promise<unknown>;
+      }>('aetherexa.stackgenome');
+      if (!extension) {
+        return undefined;
+      }
+
+      const api = extension.isActive
+        ? extension.exports
+        : await extension.activate();
+
+      return api;
+    },
+  ));
 
   const contextEngine = new ContextEngine(contextRegistry, contextRanker, tokenEstimator);
   const skillRepository = new SkillRepository(() => ({

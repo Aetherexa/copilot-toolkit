@@ -53,6 +53,10 @@ const sections: Array<{ title: string; items: Array<{ type: ContextType; label: 
     items: [{ type: 'relatedApis', label: 'Related APIs' }],
   },
   {
+    title: 'Project Intelligence',
+    items: [{ type: 'stackGenome', label: 'StackGenome Ecosystem' }],
+  },
+  {
     title: 'Workspace',
     items: [{ type: 'workspaceSummary', label: 'Workspace Summary' }],
   },
@@ -157,6 +161,24 @@ function renderOptions(
           <label className="field compact-field">
             <span>Commit Count</span>
             <input type="number" min={1} max={20} value={binding.options?.recentCommitCount ?? 5} onChange={event => onUpdateOptions(binding.type, { recentCommitCount: Number(event.target.value) || 1 })} />
+          </label>
+        </div>
+      );
+    case 'stackGenome':
+      return (
+        <div className="context-config-grid">
+          <label className="field compact-field">
+            <span>Context Profile</span>
+            <select
+              value={binding.options?.stackGenomeProfile ?? 'standard'}
+              onChange={event => onUpdateOptions(binding.type, {
+                stackGenomeProfile: event.target.value as 'compact' | 'standard' | 'detailed',
+              })}
+            >
+              <option value="compact">Compact — token efficient</option>
+              <option value="standard">Standard — recommended</option>
+              <option value="detailed">Detailed — diagnostic</option>
+            </select>
           </label>
         </div>
       );

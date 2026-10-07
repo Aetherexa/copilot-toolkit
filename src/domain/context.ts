@@ -14,7 +14,8 @@ export type ContextType =
   | 'recentCommits'
   | 'relatedTests'
   | 'relatedApis'
-  | 'workspaceSummary';
+  | 'workspaceSummary'
+  | 'stackGenome';
 
 export interface ContextOptions {
   maxTokens?: number;
@@ -29,6 +30,7 @@ export interface ContextOptions {
   includeUnstaged?: boolean;
   totalBudgetTokens?: number;
   filePaths?: string[];
+  stackGenomeProfile?: 'compact' | 'standard' | 'detailed';
 }
 
 export interface ContextBinding {
