@@ -1273,6 +1273,7 @@ export default function App() {
                 <WorkflowBuilder
                   workflow={activeWorkflow}
                   prompts={prompts}
+                  skills={skills}
                   providers={providers}
                   dirty={workflowDirty}
                   onChange={setWorkflowDraft}
