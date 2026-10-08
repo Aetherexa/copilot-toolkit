@@ -21,10 +21,13 @@ function normalizeStep(step: WorkflowStep): WorkflowStep {
     enabled: step.enabled !== false,
     continueOnFailure: Boolean(step.continueOnFailure),
     inputFromPreviousStep: Boolean(step.inputFromPreviousStep),
+    skillIds: step.skillIds === undefined
+      ? undefined
+      : [...new Set(step.skillIds.map(skillId => skillId.trim().toLowerCase()).filter(Boolean))],
     contextBindings: step.contextBindings?.map(binding => ({
       ...binding,
       options: binding.options ? { ...binding.options } : undefined,
-    })) ?? [],
+    })),
   };
 }
 
