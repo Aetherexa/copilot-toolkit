@@ -1207,6 +1207,28 @@ details summary:focus-visible {
   padding-top: 12px;
 }
 
+.workflow-skill-section {
+  border-top-style: dashed;
+}
+
+.workflow-inherited-summary {
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  padding: 9px 11px;
+  background: color-mix(in srgb, var(--studio-hover) 58%, transparent);
+  color: var(--studio-muted);
+  font-size: 12px;
+}
+
+.workflow-inherited-summary strong {
+  color: var(--studio-foreground);
+}
+
+.workflow-skill-flags {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
 .workflow-subheading {
   font-size: 12px;
   font-weight: 700;
