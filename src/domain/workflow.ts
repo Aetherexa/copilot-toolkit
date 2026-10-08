@@ -5,6 +5,7 @@ export interface WorkflowStep {
   name: string;
   promptId?: string;
   inlinePrompt?: string;
+  skillIds?: string[];
   contextBindings?: ContextBinding[];
   providerId?: string;
   modelId?: string;
