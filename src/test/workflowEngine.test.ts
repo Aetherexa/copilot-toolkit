@@ -29,6 +29,7 @@ function createPrompt(overrides: Partial<PromptDefinition> = {}): PromptDefiniti
     category: 'Test',
     tags: ['test'],
     body: 'Base body',
+    skillIds: ['security', 'performance'],
     context: [{ type: 'currentFile', enabled: true }],
     contextBudgetTokens: 400,
     providerId: 'github-copilot',
@@ -258,7 +259,30 @@ test('WorkflowEngine continues after failure when continueOnFailure is enabled',
   assert.equal(result.record.steps[1]?.status, 'success');
 });
 
-test('WorkflowEngine applies per-step provider, model, prompt and context overrides', async () => {
+test('WorkflowEngine inherits prompt skills and context when the step does not override them', async () => {
+  const stub = createExecutionStub();
+  const { workflowEngine } = createEngine(stub.engine);
+  const base = createPrompt();
+  const workflow = createWorkflow([
+    {
+      id: 'step-inherit',
+      name: 'Inherit',
+      promptId: base.id,
+      contextBindings: [],
+      enabled: true,
+    },
+  ]);
+
+  await workflowEngine.runWorkflow(workflow, [base], () => undefined);
+
+  const prepared = stub.preparedPrompts[0];
+  assert.deepEqual(prepared.skillIds, ['security', 'performance']);
+  assert.deepEqual(prepared.context, [{ type: 'currentFile', enabled: true }]);
+  assert.equal(prepared.providerId, 'github-copilot');
+  assert.equal(prepared.modelId, 'model-default');
+});
+
+test('WorkflowEngine applies per-step provider, model, skills, prompt and context overrides', async () => {
   const stub = createExecutionStub();
   const { workflowEngine } = createEngine(stub.engine);
   const base = createPrompt();
@@ -270,6 +294,7 @@ test('WorkflowEngine applies per-step provider, model, prompt and context overri
       inlinePrompt: 'Override body',
       providerId: 'provider-step',
       modelId: 'model-step',
+      skillIds: ['testing'],
       contextBindings: [{ type: 'gitDiff', enabled: true }],
       enabled: true,
     },
@@ -281,7 +306,27 @@ test('WorkflowEngine applies per-step provider, model, prompt and context overri
   assert.equal(prepared.body, 'Override body');
   assert.equal(prepared.providerId, 'provider-step');
   assert.equal(prepared.modelId, 'model-step');
+  assert.deepEqual(prepared.skillIds, ['testing']);
   assert.deepEqual(prepared.context, [{ type: 'gitDiff', enabled: true }]);
+});
+
+test('WorkflowEngine allows a step to explicitly disable inherited prompt skills', async () => {
+  const stub = createExecutionStub();
+  const { workflowEngine } = createEngine(stub.engine);
+  const base = createPrompt();
+  const workflow = createWorkflow([
+    {
+      id: 'step-no-skills',
+      name: 'No Skills',
+      promptId: base.id,
+      skillIds: [],
+      enabled: true,
+    },
+  ]);
+
+  await workflowEngine.runWorkflow(workflow, [base], () => undefined);
+
+  assert.deepEqual(stub.preparedPrompts[0].skillIds, []);
 });
 
 test('WorkflowEngine cancellation propagates to the active prompt execution', async () => {
