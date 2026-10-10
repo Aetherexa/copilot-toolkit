@@ -65,7 +65,7 @@ The Studio provides:
 - prompt metadata and editor
 - Context Builder and preview
 - provider/model selection
-- request preview and token estimates
+- pre-flight request review with token estimates, exact-request execution, and optional one-run final-request editing
 - output streaming
 - execution history
 - workflow creation and execution
@@ -114,7 +114,7 @@ Available context sources include:
 | Repository | Related Files, Related Tests, Workspace Summary |
 | Architecture | Architecture Summary, Dependency Graph, Current Feature |
 
-Context is ranked deterministically and fitted to the configured token budget. Related-file results include relevance signals and reasons where available.
+Context is ranked deterministically and fitted to the configured token budget. Related-file results include relevance signals and reasons where available. The Studio pre-flight review freezes the prepared request so the request the developer inspects is the request that executes; manual final-request edits are redacted and model-limit validated again before provider execution.
 
 ## Workspace intelligence
 

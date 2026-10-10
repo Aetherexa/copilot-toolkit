@@ -43,6 +43,8 @@ import {
   WorkflowSaveRequest,
 } from '../domain/messages';
 import { ServiceContainer } from '../app/serviceContainer';
+import { PromptExecutionProgress } from '../domain/execution';
+import { PreparedRequestStore } from '../services/PreparedRequestStore';
 
 function createNonce(): string {
   return randomBytes(18).toString('base64url');
@@ -51,6 +53,7 @@ function createNonce(): string {
 export class PromptStudioPanel {
   private static current: PromptStudioPanel | undefined;
   private readonly panelDisposables: vscode.Disposable[] = [];
+  private readonly preparedRequests = new PreparedRequestStore();
 
   static createOrReveal(services: ServiceContainer): PromptStudioPanel {
     if (PromptStudioPanel.current) {
@@ -82,6 +85,7 @@ export class PromptStudioPanel {
   ) {
     this.panel.onDidDispose(() => {
       PromptStudioPanel.current = undefined;
+      this.preparedRequests.clear();
       for (const disposable of this.panelDisposables.splice(0)) {
         disposable.dispose();
       }
@@ -326,11 +330,15 @@ export class PromptStudioPanel {
       return;
     }
 
-    const preview = await this.services.buildPreview({
+    const prompt = {
       ...message.payload.prompt,
       context: message.payload.context,
+    };
+    const prepared = await this.services.executionEngine.preparePrompt(prompt);
+    this.postMessage({
+      type: 'context.previewResult',
+      payload: this.preparedRequests.store(prompt, prepared),
     });
-    this.postMessage({ type: 'context.previewResult', payload: preview });
   }
 
   private async handleSave(message: PromptSaveRequest): Promise<void> {
@@ -354,10 +362,25 @@ export class PromptStudioPanel {
       return;
     }
 
-    const prompt = {
+    const fallbackPrompt = {
       ...message.payload.prompt,
       context: message.payload.context,
     };
+    const cached = message.payload.preparedRequestId
+      ? this.preparedRequests.consume(
+        message.payload.preparedRequestId,
+        message.payload.assembledPromptOverride,
+        (prompt, prepared, override) => this.services.executionEngine.prepareEditedPrompt(prompt, prepared, override),
+      )
+      : undefined;
+
+    if (message.payload.preparedRequestId && !cached) {
+      this.postError('The reviewed request has expired. Preview the prompt again before running it.');
+      return;
+    }
+
+    const prompt = cached?.prompt ?? fallbackPrompt;
+    const prepared = cached?.prepared;
 
     this.postMessage({
       type: 'prompt.running',
@@ -368,7 +391,7 @@ export class PromptStudioPanel {
       },
     });
 
-    const { preview, result, record } = await this.services.runPrompt(prompt, event => {
+    const onProgress = (event: PromptExecutionProgress) => {
       if (event.chunk) {
         const payload: PromptOutputMessage = {
           type: 'prompt.output',
@@ -390,7 +413,11 @@ export class PromptStudioPanel {
           },
         });
       }
-    });
+    };
+
+    const { preview, result, record } = prepared
+      ? await this.services.executionEngine.executePreparedPrompt(prompt, prepared, onProgress)
+      : await this.services.runPrompt(prompt, onProgress);
     if (!result.success && result.error) {
       vscode.window.showWarningMessage(`Copilot Toolkit: ${result.error}`);
     }

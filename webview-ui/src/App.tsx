@@ -162,7 +162,11 @@ function mergeBootstrapState(
   return { tabs: nextTabs, activeTabId: nextActiveTabId };
 }
 
-export default function App() {
+interface AppProps {
+  initialPreview?: PromptPreviewModel | null;
+}
+
+export default function App({ initialPreview = null }: AppProps = {}) {
   const [prompts, setPrompts] = useState<PromptDefinition[]>([]);
   const [skills, setSkills] = useState<StudioBootstrapPayload['skills']>([]);
   const [collections, setCollections] = useState<PromptCollection[]>([]);
@@ -178,7 +182,9 @@ export default function App() {
   const [tabs, setTabs] = useState<PromptTabState[]>(defaultState?.tabs ?? []);
   const [activeTabId, setActiveTabId] = useState<string | null>(defaultState?.activeTabId ?? null);
   const [providers, setProviders] = useState<StudioBootstrapPayload['providers']>([]);
-  const [preview, setPreview] = useState<PromptPreviewModel | null>(null);
+  const [preview, setPreview] = useState<PromptPreviewModel | null>(initialPreview);
+  const [previewDraft, setPreviewDraft] = useState<string | null>(initialPreview?.prompt ?? null);
+  const [isEditingPreview, setIsEditingPreview] = useState(false);
   const [indexingStatus, setIndexingStatus] = useState<IndexingStatus | null>(null);
   const [graphView, setGraphView] = useState<GraphView | null>(null);
   const [executionHistory, setExecutionHistory] = useState<PromptExecutionRecord[]>([]);
@@ -230,6 +236,12 @@ export default function App() {
 
   const activePrompt = activeTab?.prompt ?? null;
   const activeDirty = activeTab ? isTabDirty(activeTab) : false;
+
+  function invalidatePreview(): void {
+    setPreview(null);
+    setPreviewDraft(null);
+    setIsEditingPreview(false);
+  }
 
   useEffect(() => {
     postMessage({ type: 'studio.ready' });
@@ -318,7 +330,7 @@ export default function App() {
               },
             };
           }));
-          setPreview(null);
+          invalidatePreview();
           setMessage(paths.length > 0
             ? `Pinned ${paths.length} selected file${paths.length === 1 ? '' : 's'} as context.`
             : 'Cleared selected file context.');
@@ -328,8 +340,12 @@ export default function App() {
 
       if (incoming.type === 'context.previewResult') {
         setPreview(incoming.payload);
+        setPreviewDraft(incoming.payload.prompt);
+        setIsEditingPreview(false);
         setIsPreviewing(false);
-        setMessage(`Included ${incoming.payload.resolvedContext.filter(item => item.status !== 'excluded').length} context item(s) within budget.`);
+        setMessage(incoming.payload.requestId
+          ? `Prepared exact request with ${incoming.payload.resolvedContext.filter(item => item.status !== 'excluded').length} context item(s).`
+          : 'Execution completed using the reviewed request.');
       }
 
       if (incoming.type === 'prompt.running') {
@@ -544,7 +560,7 @@ export default function App() {
     const existing = tabs.find(tab => tab.prompt.id === prompt.id || tab.savedPrompt?.id === prompt.id);
     if (existing) {
       setActiveTabId(existing.id);
-      setPreview(null);
+      invalidatePreview();
       setError('');
       return;
     }
@@ -552,7 +568,7 @@ export default function App() {
     const tab = createTab(prompt);
     setTabs(current => [...current, tab]);
     setActiveTabId(tab.id);
-    setPreview(null);
+    invalidatePreview();
     setError('');
     setMessage('');
   }
@@ -569,6 +585,7 @@ export default function App() {
     setTabs(current => current.map(tab => tab.id === activeTabId
       ? { ...tab, prompt: { ...nextPrompt, updatedAt: Date.now() } }
       : tab));
+    invalidatePreview();
   }
 
   function updateCurrentTabPrompt(updater: (prompt: PromptDefinition) => PromptDefinition): void {
@@ -577,12 +594,13 @@ export default function App() {
     }
 
     setTabs(current => current.map(tab => tab.id === activeTabId ? { ...tab, prompt: updater(tab.prompt) } : tab));
+    invalidatePreview();
   }
 
   function focusTab(tabId: string): void {
     setActiveNav('Prompt Editor');
     setActiveTabId(tabId);
-    setPreview(null);
+    invalidatePreview();
     setError('');
   }
 
@@ -600,7 +618,7 @@ export default function App() {
     setTabs(remaining);
     if (tabId === activeTabId) {
       setActiveTabId(remaining[remaining.length - 1]?.id ?? null);
-      setPreview(null);
+      invalidatePreview();
     }
   }
 
@@ -716,7 +734,7 @@ export default function App() {
       context: mergeContextBindings(prompt.context.filter(binding => binding.type !== type), [nextBinding]),
       updatedAt: Date.now(),
     }));
-    setPreview(current => current ? { ...current, resolvedContext: current.resolvedContext.filter(item => item.type !== type) } : current);
+    invalidatePreview();
   }
 
   function updateContextOptions(type: ContextType, options: Partial<NonNullable<ContextBinding['options']>>): void {
@@ -769,7 +787,7 @@ export default function App() {
       context: prompt.context.map(binding => binding.type === type ? { ...binding, enabled: false } : binding),
       updatedAt: Date.now(),
     }));
-    setPreview(current => current ? { ...current, resolvedContext: current.resolvedContext.filter(item => item.type !== type) } : current);
+    invalidatePreview();
   }
 
   function pickSelectedFiles(): void {
@@ -816,7 +834,7 @@ export default function App() {
         updatedAt: Date.now(),
       };
     });
-    setPreview(null);
+    invalidatePreview();
   }
 
   function previewContext(): void {
@@ -834,11 +852,26 @@ export default function App() {
       return;
     }
 
+    if (!preview?.requestId) {
+      setMessage('Build and review the exact request before running it.');
+      previewContext();
+      return;
+    }
+
+    const reviewedPrompt = previewDraft ?? preview.prompt;
     setIsRunning(true);
     setCurrentOutput('');
     setCurrentExecutionId(null);
     setActiveWorkbenchTab('output');
-    postMessage({ type: 'prompt.run', payload: { prompt: activePrompt, context: activePrompt.context } });
+    postMessage({
+      type: 'prompt.run',
+      payload: {
+        prompt: activePrompt,
+        context: activePrompt.context,
+        preparedRequestId: preview.requestId,
+        assembledPromptOverride: reviewedPrompt !== preview.prompt ? reviewedPrompt : undefined,
+      },
+    });
   }
 
   function selectProvider(providerId: string, modelId: string): void {
@@ -1180,7 +1213,7 @@ export default function App() {
               <button type="button" className="button-secondary" onClick={() => handleFavoriteToggle()} disabled={!activePrompt}>{activePrompt?.favorite ? 'Unfavorite' : 'Favorite'}</button>
               <button type="button" className="button-secondary" onClick={handleExportPrompt} disabled={!activePrompt}>Export</button>
               <button type="button" className="button-secondary danger-text" onClick={handleDeletePrompt} disabled={!activePrompt}>Delete</button>
-              <button type="button" className="button-primary" onClick={runPrompt} disabled={!activePrompt || isRunning}>{isRunning ? 'Running...' : 'Run Prompt'}</button>
+              <button type="button" className="button-primary" onClick={runPrompt} disabled={!activePrompt || isRunning}>{isRunning ? 'Running...' : preview?.requestId ? 'Run Reviewed Request' : 'Review Request'}</button>
             </>
           ) : promptCatalogNav ? (
             <button type="button" className="button-secondary" onClick={handleCreatePrompt}>New Custom Prompt</button>
@@ -1444,7 +1477,26 @@ export default function App() {
                       </div>
 
                       {activeWorkbenchTab === 'preview' && (
-                        <PromptPreview preview={preview} runningMessage={message} providerName={activeProvider?.displayName ?? activeProvider?.name} modelName={activeModel?.name} />
+                        <PromptPreview
+                          preview={preview}
+                          runningMessage={message}
+                          providerName={activeProvider?.displayName ?? activeProvider?.name}
+                          modelName={activeModel?.name}
+                          editedPrompt={previewDraft}
+                          editing={isEditingPreview}
+                          running={isRunning}
+                          onEdit={() => {
+                            setPreviewDraft(preview?.prompt ?? '');
+                            setIsEditingPreview(true);
+                          }}
+                          onCancelEdit={() => {
+                            setPreviewDraft(preview?.prompt ?? null);
+                            setIsEditingPreview(false);
+                          }}
+                          onChangeEditedPrompt={setPreviewDraft}
+                          onRebuild={previewContext}
+                          onRunReviewed={runPrompt}
+                        />
                       )}
                       {activeWorkbenchTab === 'output' && (
                         <OutputPanel
@@ -1481,7 +1533,9 @@ export default function App() {
                       )}
                     </section>
                     <TokenSummary
-                      totalTokens={preview?.totalTokens ?? 0}
+                      totalTokens={previewDraft !== null && preview && previewDraft !== preview.prompt
+                        ? Math.max(1, Math.ceil(previewDraft.length / 4))
+                        : (preview?.totalTokens ?? 0)}
                       contextItems={preview?.resolvedContext.length ?? enabledContext.length}
                       provider={activeProvider?.name ?? 'GitHub Copilot'}
                       model={activeModel?.name ?? 'Default'}

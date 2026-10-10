@@ -743,6 +743,121 @@ details summary:focus-visible {
   overflow: auto;
 }
 
+
+.preflight-heading,
+.preflight-request-head,
+.preflight-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.preflight-heading {
+  margin-bottom: 12px;
+}
+
+.preflight-heading .field-help {
+  margin: 4px 0 0;
+}
+
+.preflight-badge {
+  border: 1px solid color-mix(in srgb, var(--vscode-testing-iconPassed, #73c991) 55%, var(--studio-border));
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--vscode-testing-iconPassed, #73c991);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.preflight-empty {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.preflight-request {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  border: 1px solid var(--studio-border);
+  border-radius: 12px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--studio-bg) 90%, var(--studio-sidebar));
+}
+
+.preflight-request-head > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.preflight-request-head span {
+  color: var(--studio-muted);
+  font-size: 12px;
+}
+
+.preflight-request-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.preflight-code,
+.preflight-editor {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 220px;
+  max-height: 420px;
+  overflow: auto;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--studio-input-border);
+  border-radius: 10px;
+  background: var(--studio-code);
+  color: var(--studio-foreground);
+  font-family: var(--vscode-editor-font-family, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.preflight-editor {
+  resize: vertical;
+  outline: none;
+}
+
+.preflight-editor:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+.preflight-warning {
+  border-left: 3px solid var(--vscode-editorWarning-foreground, #cca700);
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--vscode-editorWarning-foreground, #cca700) 9%, transparent);
+  color: var(--studio-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.preflight-actions {
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 780px) {
+  .preflight-heading,
+  .preflight-request-head,
+  .preflight-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .preflight-badge {
+    width: fit-content;
+  }
+}
+
 .output-content {
   display: grid;
   gap: 12px;
