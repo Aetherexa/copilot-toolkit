@@ -55,6 +55,11 @@ let capturedEditorProps: AnyProps | null = null;
 let capturedProviderProps: AnyProps | null = null;
 const postedMessages: unknown[] = [];
 
+function requireProps(value: AnyProps | null, label: string): AnyProps {
+  assert.ok(value, `${label} props were not captured`);
+  return value as AnyProps;
+}
+
 async function loadApp() {
   (globalThis as typeof globalThis & { acquireVsCodeApi?: unknown }).acquireVsCodeApi = () => ({
     postMessage(message: unknown) {
@@ -95,9 +100,9 @@ test('App exposes review-first execution controls for an active prompt', async (
   assert.match(html, /Review Request/);
   assert.match(html, /Pre-flight Request Review/);
   assert.match(html, /Review Component/);
-  assert.ok(capturedPreviewProps);
+  const previewProps = requireProps(capturedPreviewProps, 'PromptPreview');
 
-  (capturedPreviewProps.onRebuild as () => void)();
+  (previewProps.onRebuild as () => void)();
 
   assert.deepEqual(postedMessages.at(-1), {
     type: 'context.preview',
@@ -112,10 +117,10 @@ test('App executes the exact prepared request from pre-flight review', async () 
   const html = renderToStaticMarkup(<App initialPreview={preparedPreview} />);
 
   assert.match(html, /Run Reviewed Request/);
-  assert.ok(capturedPreviewProps);
-  assert.equal(capturedPreviewProps.preview, preparedPreview);
+  const previewProps = requireProps(capturedPreviewProps, 'PromptPreview');
+  assert.equal(previewProps.preview, preparedPreview);
 
-  (capturedPreviewProps.onRunReviewed as () => void)();
+  (previewProps.onRunReviewed as () => void)();
 
   assert.deepEqual(postedMessages.at(-1), {
     type: 'prompt.run',
@@ -137,20 +142,20 @@ test('App invalidates prepared review state when prompt or provider inputs chang
 
   renderToStaticMarkup(<App initialPreview={preparedPreview} />);
 
-  assert.ok(capturedEditorProps);
-  assert.ok(capturedProviderProps);
-  assert.ok(capturedPreviewProps);
+  const editorProps = requireProps(capturedEditorProps, 'PromptEditor');
+  const providerProps = requireProps(capturedProviderProps, 'ProviderSelector');
+  const previewProps = requireProps(capturedPreviewProps, 'PromptPreview');
 
-  (capturedEditorProps.onChange as (next: PromptDefinition) => void)({
+  (editorProps.onChange as (next: PromptDefinition) => void)({
     ...prompt,
     body: 'Review the updated component',
   });
-  (capturedProviderProps.onSelect as (providerId: string, modelId: string) => void)(
+  (providerProps.onSelect as (providerId: string, modelId: string) => void)(
     'github-copilot',
     'model-2',
   );
-  (capturedPreviewProps.onEdit as () => void)();
-  (capturedPreviewProps.onCancelEdit as () => void)();
+  (previewProps.onEdit as () => void)();
+  (previewProps.onCancelEdit as () => void)();
 
   assert.equal(postedMessages.length, 0);
 });
