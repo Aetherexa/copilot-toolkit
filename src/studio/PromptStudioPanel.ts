@@ -44,6 +44,7 @@ import {
 } from '../domain/messages';
 import { ServiceContainer } from '../app/serviceContainer';
 import { PromptDefinition } from '../domain/prompt';
+import { PromptExecutionProgress } from '../domain/execution';
 import { PreparedPromptExecution } from '../services/ExecutionEngine';
 
 function createNonce(): string {
@@ -409,7 +410,7 @@ export class PromptStudioPanel {
       },
     });
 
-    const onProgress = (event: Parameters<typeof this.services.executionEngine.executePreparedPrompt>[2] extends (event: infer T) => void ? T : never) => {
+    const onProgress = (event: PromptExecutionProgress) => {
       if (event.chunk) {
         const payload: PromptOutputMessage = {
           type: 'prompt.output',
