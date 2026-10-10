@@ -142,7 +142,7 @@
 		"quality": "npm run compile && npm run test:coverage",
 		"package:vsix": "npm run compile && npx @vscode/vsce package --no-dependencies",
 		"test:coverage:lcov": "npm run compile:extension && npm run compile:webview-tests && npx --yes c8@10.1.3 --reporter=lcov --reporter=text --reports-dir=coverage --exclude=out/test/** --exclude=out-webview-test/**/test/** node --test out/test/*.test.js out-webview-test/webview-ui/src/test/*.test.js",
-		"compile:webview-tests": "tsc -p webview-ui/tsconfig.test.json"
+		"compile:webview-tests": "tsc -p webview-ui/tsconfig.test.json && node scripts/prepare-webview-test-runtime.js"
 	},
 	"dependencies": {
 		"react": "^18.3.1",
