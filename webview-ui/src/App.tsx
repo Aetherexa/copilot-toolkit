@@ -162,7 +162,11 @@ function mergeBootstrapState(
   return { tabs: nextTabs, activeTabId: nextActiveTabId };
 }
 
-export default function App() {
+interface AppProps {
+  initialPreview?: PromptPreviewModel | null;
+}
+
+export default function App({ initialPreview = null }: AppProps = {}) {
   const [prompts, setPrompts] = useState<PromptDefinition[]>([]);
   const [skills, setSkills] = useState<StudioBootstrapPayload['skills']>([]);
   const [collections, setCollections] = useState<PromptCollection[]>([]);
@@ -178,8 +182,8 @@ export default function App() {
   const [tabs, setTabs] = useState<PromptTabState[]>(defaultState?.tabs ?? []);
   const [activeTabId, setActiveTabId] = useState<string | null>(defaultState?.activeTabId ?? null);
   const [providers, setProviders] = useState<StudioBootstrapPayload['providers']>([]);
-  const [preview, setPreview] = useState<PromptPreviewModel | null>(null);
-  const [previewDraft, setPreviewDraft] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PromptPreviewModel | null>(initialPreview);
+  const [previewDraft, setPreviewDraft] = useState<string | null>(initialPreview?.prompt ?? null);
   const [isEditingPreview, setIsEditingPreview] = useState(false);
   const [indexingStatus, setIndexingStatus] = useState<IndexingStatus | null>(null);
   const [graphView, setGraphView] = useState<GraphView | null>(null);
