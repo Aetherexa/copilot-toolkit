@@ -47,6 +47,8 @@ export interface CollectionExportPayload {
 }
 
 export interface PromptPreview {
+  /** Opaque identifier for the exact prepared request represented by this preview. */
+  requestId?: string;
   prompt: string;
   promptTokens: number;
   contextTokens: number;
