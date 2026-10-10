@@ -192,6 +192,85 @@ test('ExecutionEngine redacts secret-like literals from the final provider reque
   assert.match(receivedPrompt, /\[REDACTED\]/);
 });
 
+test('ExecutionEngine executes the exact prepared request even if the editable prompt changes afterward', async () => {
+  let receivedPrompt = '';
+  const provider = createProvider({
+    async execute(request) {
+      receivedPrompt = request.assembledPrompt;
+      return {
+        success: true,
+        providerId: 'github-copilot',
+        providerName: 'GitHub Copilot',
+        modelId: 'model-1',
+        responseText: 'ok',
+      };
+    },
+  });
+  const { engine } = createEngine(provider);
+  const prompt = createPrompt();
+  const prepared = await engine.preparePrompt(prompt);
+  const reviewedRequest = prepared.request.assembledPrompt;
+
+  prompt.body = 'This text changed after preview.';
+  await engine.executePreparedPrompt(prompt, prepared, () => undefined);
+
+  assert.equal(receivedPrompt, reviewedRequest);
+  assert.doesNotMatch(receivedPrompt, /changed after preview/);
+});
+
+test('ExecutionEngine re-redacts and re-estimates manually edited prepared requests', async () => {
+  let receivedPrompt = '';
+  const provider = createProvider({
+    async execute(request) {
+      receivedPrompt = request.assembledPrompt;
+      return {
+        success: true,
+        providerId: 'github-copilot',
+        providerName: 'GitHub Copilot',
+        modelId: 'model-1',
+        responseText: 'ok',
+      };
+    },
+  });
+  const { engine } = createEngine(provider);
+  const prompt = createPrompt();
+  const prepared = await engine.preparePrompt(prompt);
+  const edited = engine.prepareEditedPrompt(
+    prompt,
+    prepared,
+    'Review this request with API_KEY=manual-secret-value',
+  );
+
+  assert.doesNotMatch(edited.request.assembledPrompt, /manual-secret-value/);
+  assert.match(edited.request.assembledPrompt, /\[REDACTED\]/);
+  assert.equal(edited.preview.prompt, edited.request.assembledPrompt);
+  assert.equal(edited.preview.totalTokens, edited.request.estimatedInputTokens);
+  assert.deepEqual(edited.request.resolvedContext, prepared.request.resolvedContext);
+
+  await engine.executePreparedPrompt(prompt, edited, () => undefined);
+  assert.equal(receivedPrompt, edited.request.assembledPrompt);
+});
+
+test('ExecutionEngine rejects a manual request override that exceeds the selected model limit', async () => {
+  const provider = createProvider({
+    definition: {
+      id: 'github-copilot',
+      name: 'GitHub Copilot',
+      enabled: true,
+      status: 'available',
+      models: [{ id: 'model-1', name: 'Tiny Model', enabled: true, maxInputTokens: 20 }],
+    },
+  });
+  const { engine } = createEngine(provider);
+  const prompt = createPrompt();
+  const prepared = await engine.preparePrompt(prompt);
+
+  assert.throws(
+    () => engine.prepareEditedPrompt(prompt, prepared, 'x'.repeat(200)),
+    /Edited request exceeds the selected model input limit/,
+  );
+});
+
 test('ExecutionEngine rejects requests that exceed the selected model input limit', async () => {
   const provider = createProvider({
     definition: {
