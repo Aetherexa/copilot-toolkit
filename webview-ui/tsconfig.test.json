@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "../out-webview-test",
+    "rootDir": "..",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "isolatedModules": false,
+    "sourceMap": true,
+    "inlineSources": true,
+    "types": ["node", "react", "react-dom"]
+  },
+  "include": [
+    "src/components/PromptPreview.tsx",
+    "src/App.tsx",
+    "src/vscode.ts",
+    "src/types.ts",
+    "src/test/**/*.test.tsx"
+  ]
+}
