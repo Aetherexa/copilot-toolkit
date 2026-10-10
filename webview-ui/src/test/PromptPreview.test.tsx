@@ -91,7 +91,7 @@ test('PromptPreview renders the exact prepared request, metrics and resolved con
   assert.match(html, /Included · 5 tokens/);
   assert.match(html, /Excluded · 3 tokens/);
   assert.match(html, /Outside token budget/);
-  assert.match(html, /Generated from Prompt + Skills + Context/);
+  assert.ok(html.includes('Generated from Prompt + Skills + Context'));
   assert.match(html, /Run Reviewed Request/);
 });
 
