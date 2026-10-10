@@ -234,6 +234,10 @@ export interface PromptRunRequest {
   payload: {
     prompt: PromptDefinition;
     context: ContextBinding[];
+    /** Execute the exact request produced by a prior preview when supplied. */
+    preparedRequestId?: string;
+    /** Optional one-run override of the final assembled request. */
+    assembledPromptOverride?: string;
   };
 }
 
