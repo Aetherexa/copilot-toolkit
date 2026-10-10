@@ -217,22 +217,7 @@ export function createServiceContainer(context: vscode.ExtensionContext): Servic
     },
     toBootstrap,
     async buildPreview(prompt: PromptDefinition): Promise<PromptPreview> {
-      if (needsWorkspaceIntelligence(prompt.context)) {
-        await workspaceIntelligence.ensureInitialized();
-      }
-      const resolution = await contextEngine.resolve(prompt.context, prompt.contextBudgetTokens ?? 1800);
-      const assembledPrompt = promptAssembler.assemble(prompt, resolution.items);
-      return {
-        prompt: assembledPrompt,
-        promptTokens: tokenEstimator.estimate(promptAssembler.assemble(prompt, [])),
-        contextTokens: resolution.includedTokens,
-        totalTokens: tokenEstimator.estimate(assembledPrompt),
-        contextBudgetTokens: resolution.budgetTokens,
-        totalCandidateContextTokens: resolution.totalCandidateTokens,
-        utilizationPercent: resolution.utilizationPercent,
-        excludedContextCount: resolution.excludedCount,
-        resolvedContext: resolution.items,
-      };
+      return (await executionEngine.preparePrompt(prompt)).preview;
     },
     async runPrompt(prompt: PromptDefinition, onProgress) {
       if (!providerRegistry.get(prompt.providerId ?? defaultProvider.definition.id)) {
