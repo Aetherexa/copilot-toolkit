@@ -581,6 +581,7 @@ export default function App() {
     setTabs(current => current.map(tab => tab.id === activeTabId
       ? { ...tab, prompt: { ...nextPrompt, updatedAt: Date.now() } }
       : tab));
+    invalidatePreview();
   }
 
   function updateCurrentTabPrompt(updater: (prompt: PromptDefinition) => PromptDefinition): void {
@@ -589,6 +590,7 @@ export default function App() {
     }
 
     setTabs(current => current.map(tab => tab.id === activeTabId ? { ...tab, prompt: updater(tab.prompt) } : tab));
+    invalidatePreview();
   }
 
   function focusTab(tabId: string): void {
@@ -781,7 +783,7 @@ export default function App() {
       context: prompt.context.map(binding => binding.type === type ? { ...binding, enabled: false } : binding),
       updatedAt: Date.now(),
     }));
-    setPreview(current => current ? { ...current, resolvedContext: current.resolvedContext.filter(item => item.type !== type) } : current);
+    invalidatePreview();
   }
 
   function pickSelectedFiles(): void {
