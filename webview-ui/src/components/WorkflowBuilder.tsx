@@ -1,9 +1,10 @@
 import { ChangeEvent } from 'react';
-import { AIProvider, ContextBinding, ContextType, PromptDefinition, Workflow, WorkflowStep } from '../types';
+import { AIProvider, ContextBinding, ContextType, PromptDefinition, SkillSummary, Workflow, WorkflowStep } from '../types';
 
 interface WorkflowBuilderProps {
   workflow: Workflow;
   prompts: PromptDefinition[];
+  skills: SkillSummary[];
   providers: AIProvider[];
   dirty: boolean;
   onChange: (workflow: Workflow) => void;
@@ -53,7 +54,13 @@ function toggleBinding(bindings: ContextBinding[], type: ContextType, label: str
   return [...bindings, { type, label, enabled: true }];
 }
 
-export function WorkflowBuilder({ workflow, prompts, providers, dirty, onChange, onDeleteStep, onAddStep, onMoveStep }: WorkflowBuilderProps) {
+function toggleSkill(skillIds: string[], skillId: string): string[] {
+  return skillIds.includes(skillId)
+    ? skillIds.filter(id => id !== skillId)
+    : [...skillIds, skillId];
+}
+
+export function WorkflowBuilder({ workflow, prompts, skills, providers, dirty, onChange, onDeleteStep, onAddStep, onMoveStep }: WorkflowBuilderProps) {
   const promptOptions = prompts.map(prompt => ({ label: prompt.name, value: prompt.id }));
 
   function updateWorkflow(field: keyof Workflow, value: string) {
@@ -92,7 +99,10 @@ export function WorkflowBuilder({ workflow, prompts, providers, dirty, onChange,
         {workflow.steps.map((step, index) => {
           const provider = providers.find(item => item.id === step.providerId) ?? providers[0];
           const savedPrompt = prompts.find(prompt => prompt.id === step.promptId);
-          const contextMode = step.contextBindings === undefined ? 'inherit' : 'custom';
+          const contextMode = step.contextBindings === undefined || step.contextBindings.length === 0 ? 'inherit' : 'custom';
+          const skillMode = step.skillIds === undefined ? 'inherit' : 'custom';
+          const inheritedSkillNames = (savedPrompt?.skillIds ?? [])
+            .map(skillId => skills.find(skill => skill.id === skillId)?.name ?? skillId);
           return (
             <article key={step.id} className="workflow-step-card">
               <div className="workflow-step-head">
@@ -156,6 +166,21 @@ export function WorkflowBuilder({ workflow, prompts, providers, dirty, onChange,
                   </select>
                 </label>
                 <label className="field compact-field">
+                  <span>Skills</span>
+                  <select
+                    value={skillMode}
+                    onChange={event => updateWorkflowStep(step.id, current => ({
+                      ...current,
+                      skillIds: event.target.value === 'inherit'
+                        ? undefined
+                        : [...(savedPrompt?.skillIds ?? [])],
+                    }))}
+                  >
+                    <option value="inherit">Prompt default</option>
+                    <option value="custom">Custom for this step</option>
+                  </select>
+                </label>
+                <label className="field compact-field">
                   <span>Context</span>
                   <select
                     value={contextMode}
@@ -163,7 +188,11 @@ export function WorkflowBuilder({ workflow, prompts, providers, dirty, onChange,
                       ...current,
                       contextBindings: event.target.value === 'inherit'
                         ? undefined
-                        : cloneBindings(savedPrompt?.context ?? [{ type: 'currentFile', label: 'Current File', enabled: true }]),
+                        : cloneBindings(
+                          (savedPrompt?.context?.length ?? 0) > 0
+                            ? savedPrompt!.context
+                            : [{ type: 'currentFile', label: 'Current File', enabled: true }],
+                        ),
                     }))}
                   >
                     <option value="inherit">Prompt default</option>
@@ -171,6 +200,42 @@ export function WorkflowBuilder({ workflow, prompts, providers, dirty, onChange,
                   </select>
                 </label>
               </div>
+
+              {skillMode === 'inherit' && (
+                <div className="workflow-inherited-summary">
+                  <strong>Step Skills:</strong>{' '}
+                  {inheritedSkillNames.length > 0
+                    ? inheritedSkillNames.join(', ')
+                    : step.promptId
+                      ? 'No skills configured on the saved prompt'
+                      : 'No saved prompt selected'}
+                </div>
+              )}
+
+              {skillMode === 'custom' && (
+                <div className="workflow-context-section workflow-skill-section">
+                  <div className="workflow-subheading">Step Skills</div>
+                  {skills.length === 0 ? (
+                    <div className="field-help">No workspace skills found under .copilot/skills/.</div>
+                  ) : (
+                    <div className="workflow-step-flags workflow-skill-flags" aria-label={`Skills for ${step.name}`}>
+                      {skills.map(skill => (
+                        <label key={skill.id} className="checkbox-field" title={skill.description ?? skill.sourcePath}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(step.skillIds?.includes(skill.id))}
+                            onChange={() => updateWorkflowStep(step.id, current => ({
+                              ...current,
+                              skillIds: toggleSkill(current.skillIds ?? [], skill.id),
+                            }))}
+                          />
+                          <span>{skill.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {contextMode === 'custom' && (
                 <div className="workflow-context-section">

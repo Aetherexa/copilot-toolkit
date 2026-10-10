@@ -41,7 +41,10 @@ function buildStepPrompt(step: WorkflowStep, promptDefinition: PromptDefinition 
     tags: promptDefinition?.tags ?? ['workflow'],
     body: step.inlinePrompt ?? promptDefinition?.body ?? '',
     favorite: false,
-    context: step.contextBindings ?? promptDefinition?.context ?? [],
+    skillIds: step.skillIds ?? promptDefinition?.skillIds ?? [],
+    context: step.contextBindings && step.contextBindings.length > 0
+      ? step.contextBindings
+      : promptDefinition?.context ?? [],
     contextBudgetTokens: promptDefinition?.contextBudgetTokens ?? 1800,
     providerId: step.providerId ?? promptDefinition?.providerId,
     modelId: step.modelId ?? promptDefinition?.modelId,
@@ -84,6 +87,7 @@ export class WorkflowEngine {
     this.active.set(executionId, control);
     const startedAt = Date.now();
     const stepRecords: WorkflowStepExecutionRecord[] = [];
+    const workflowSkillIds = new Set<string>();
     let previousOutput = '';
     let fatalError: string | undefined;
 
@@ -100,6 +104,9 @@ export class WorkflowEngine {
         onProgress({ executionId, workflowId: workflow.id, stepId: step.id, stepName: step.name, status: 'running' });
         const promptDefinition = prompts.find(prompt => prompt.id === step.promptId);
         const stepPrompt = buildStepPrompt(step, promptDefinition);
+        for (const skillId of stepPrompt.skillIds ?? []) {
+          workflowSkillIds.add(skillId);
+        }
         const extraContext = step.inputFromPreviousStep && previousOutput
           ? [previousOutputContext(previousOutput, this.tokenEstimator)]
           : [];
@@ -193,7 +200,7 @@ export class WorkflowEngine {
       await this.historyStore.save(persistedRecord);
       await recordExecution(this.context.globalState, {
         mode: 'workflow',
-        skillNames: ['workflow'],
+        skillNames: workflowSkillIds.size > 0 ? [...workflowSkillIds] : ['workflow'],
         promptLabel: workflow.name,
         languageId: 'workflow',
         fileName: workflow.name,

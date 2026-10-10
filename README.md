@@ -157,8 +157,9 @@ PR Description
 Each step can independently configure:
 
 - saved prompt or inline prompt
+- inherit the prompt's skills or select custom skills for the step
 - provider/model override
-- context override
+- inherit prompt context or use custom context
 - previous-step output
 - enabled/disabled state
 - stop-on-failure or continue-on-failure
