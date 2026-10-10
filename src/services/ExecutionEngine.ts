@@ -121,6 +121,37 @@ export class ExecutionEngine {
     };
   }
 
+  prepareEditedPrompt(
+    prompt: PromptDefinition,
+    prepared: PreparedPromptExecution,
+    assembledPrompt: string,
+  ): PreparedPromptExecution {
+    const sanitizedPrompt = redactSecrets(assembledPrompt).text;
+    const estimatedInputTokens = this.tokenEstimator.estimate(sanitizedPrompt);
+    const providerId = prompt.providerId ?? 'github-copilot';
+    const model = this.providerRegistry.getModel(providerId, prompt.modelId);
+
+    if (model?.maxInputTokens && estimatedInputTokens > model.maxInputTokens) {
+      throw new Error(
+        `Edited request exceeds the selected model input limit (${estimatedInputTokens}/${model.maxInputTokens} tokens estimated).`,
+      );
+    }
+
+    return {
+      preview: {
+        ...prepared.preview,
+        prompt: sanitizedPrompt,
+        totalTokens: estimatedInputTokens,
+      },
+      request: {
+        ...prepared.request,
+        prompt,
+        assembledPrompt: sanitizedPrompt,
+        estimatedInputTokens,
+      },
+    };
+  }
+
   async executePreparedPrompt(
     prompt: PromptDefinition,
     prepared: PreparedPromptExecution,
