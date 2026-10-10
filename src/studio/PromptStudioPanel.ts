@@ -43,9 +43,8 @@ import {
   WorkflowSaveRequest,
 } from '../domain/messages';
 import { ServiceContainer } from '../app/serviceContainer';
-import { PromptDefinition } from '../domain/prompt';
 import { PromptExecutionProgress } from '../domain/execution';
-import { PreparedPromptExecution } from '../services/ExecutionEngine';
+import { PreparedRequestStore } from '../services/PreparedRequestStore';
 
 function createNonce(): string {
   return randomBytes(18).toString('base64url');
@@ -54,7 +53,7 @@ function createNonce(): string {
 export class PromptStudioPanel {
   private static current: PromptStudioPanel | undefined;
   private readonly panelDisposables: vscode.Disposable[] = [];
-  private readonly preparedRequests = new Map<string, { prompt: PromptDefinition; prepared: PreparedPromptExecution }>();
+  private readonly preparedRequests = new PreparedRequestStore();
 
   static createOrReveal(services: ServiceContainer): PromptStudioPanel {
     if (PromptStudioPanel.current) {
@@ -336,20 +335,9 @@ export class PromptStudioPanel {
       context: message.payload.context,
     };
     const prepared = await this.services.executionEngine.preparePrompt(prompt);
-    const requestId = createNonce();
-
-    this.preparedRequests.set(requestId, { prompt, prepared });
-    while (this.preparedRequests.size > 12) {
-      const oldest = this.preparedRequests.keys().next().value as string | undefined;
-      if (!oldest) {
-        break;
-      }
-      this.preparedRequests.delete(oldest);
-    }
-
     this.postMessage({
       type: 'context.previewResult',
-      payload: { ...prepared.preview, requestId },
+      payload: this.preparedRequests.store(prompt, prepared),
     });
   }
 
@@ -379,7 +367,11 @@ export class PromptStudioPanel {
       context: message.payload.context,
     };
     const cached = message.payload.preparedRequestId
-      ? this.preparedRequests.get(message.payload.preparedRequestId)
+      ? this.preparedRequests.consume(
+        message.payload.preparedRequestId,
+        message.payload.assembledPromptOverride,
+        (prompt, prepared, override) => this.services.executionEngine.prepareEditedPrompt(prompt, prepared, override),
+      )
       : undefined;
 
     if (message.payload.preparedRequestId && !cached) {
@@ -388,18 +380,7 @@ export class PromptStudioPanel {
     }
 
     const prompt = cached?.prompt ?? fallbackPrompt;
-    let prepared = cached?.prepared;
-    if (prepared && message.payload.assembledPromptOverride !== undefined) {
-      prepared = this.services.executionEngine.prepareEditedPrompt(
-        prompt,
-        prepared,
-        message.payload.assembledPromptOverride,
-      );
-    }
-
-    if (message.payload.preparedRequestId) {
-      this.preparedRequests.delete(message.payload.preparedRequestId);
-    }
+    const prepared = cached?.prepared;
 
     this.postMessage({
       type: 'prompt.running',
